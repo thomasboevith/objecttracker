@@ -4,6 +4,11 @@ objecttracker
 An open source object detection and tracking application for use in for example
 traffic planning by counting of vehicles.
 
+TODO
+----
+
+- Set up virtualenv http://pypi.python.org/pypi/virtualenv with required Python packages
+
 Tools
 -----
 
