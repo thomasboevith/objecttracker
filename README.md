@@ -25,7 +25,8 @@ Method
 ------
 
 1. Object detection
-
+   - Input: An video stream / series of image files (Gray scale or RGB data)
+    - Output: Segmented and labelled pixel groups / objects
 2. Object tracking
 
 3. Object classification
