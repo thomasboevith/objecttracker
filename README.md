@@ -4,11 +4,8 @@ objecttracker
 An open source object detection and tracking application for use in for example
 traffic planning by counting of vehicles.
 
-TODO
-----
-
-Tools
------
+Dependencies
+------------
 
 - Python http://python.org/
 - NumPy http://numpy.org/
@@ -24,10 +21,16 @@ Method
 
 1. Object detection
    - Input: An video stream / series of image files (Gray scale or RGB data)
-    - Output: Segmented and labelled pixel groups / objects
-2. Object tracking
+   - Output: Labelled connected components.
 
-3. Object classification
+2. Object tracking
+   - Assign labelled connected components to tracks.
+
+3. Object count.
+   - 
+
+4. Object classification:
+
 
 References
 ----------
