@@ -37,7 +37,7 @@ class Track:
         t.set_parent(self)
         return t
 
-    def length(self):
+    def length(self, include_parents=False):
         """
         The length of a track, including its parent track.
 
@@ -51,7 +51,7 @@ class Track:
         """
         # The length of all the parents.
         parent_length = 0
-        if self.parent != None and len(self.parent.trackpoints) > 0:
+        if include_parents and self.parent != None and len(self.parent.trackpoints) > 0:
             parent_length += self.parent.length()
 
             # The length between the last parent tracpoint and the this
@@ -64,20 +64,21 @@ class Track:
                 zip(self.trackpoints, self.trackpoints[1:])
                 ))
 
-    def number_of_trackpoints(self):
+    def number_of_trackpoints(self, include_parents=False):
         """
         Returns the number of trackpoints for the track.
         """
         number_of_trackpoints = 0
-        if self.parent != None:
+        if include_parents and self.parent != None:
             number_of_trackpoints = self.parent.number_of_trackpoints()
         return number_of_trackpoints + len(self.trackpoints)
 
-    def save(self, filename):
+
+    def save(self, filename, include_parents=False):
         """
         Saves the trackpoints to a file, including the parent track.
         """
-        if self.parent != None:
+        if include_parents and self.parent != None:
             self.save(filename)
 
         with open(filename, 'a') as fp:
