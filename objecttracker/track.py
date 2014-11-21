@@ -1,5 +1,5 @@
 import numpy as np
-import trackpoint
+from trackpoint import Trackpoint
 
 
 class Track:
@@ -12,7 +12,7 @@ class Track:
         """
         Adding a trackpoint to the track.
         """
-        assert(isinstance(trackpoint, trackpoint.TrackPoint))
+        assert(isinstance(trackpoint, Trackpoint))
         self.trackpoints.append(trackpoint)
 
     def set_parent(self, parent):
@@ -51,7 +51,8 @@ class Track:
         """
         # The length of all the parents.
         parent_length = 0
-        if include_parents and self.parent != None and len(self.parent.trackpoints) > 0:
+        if include_parents and self.parent is not None \
+           and len(self.parent.trackpoints) > 0:
             parent_length += self.parent.length()
 
             # The length between the last parent tracpoint and the this
@@ -60,27 +61,26 @@ class Track:
             parent_length += last_parent_tp.length_to(self.trackpoints[0])
 
         return parent_length + sum(map(
-                lambda (tp0, tp1): tp0.length_to(tp1),
-                zip(self.trackpoints, self.trackpoints[1:])
-                ))
+            lambda (tp0, tp1): tp0.length_to(tp1),
+            zip(self.trackpoints, self.trackpoints[1:])
+        ))
 
     def number_of_trackpoints(self, include_parents=False):
         """
         Returns the number of trackpoints for the track.
         """
         number_of_trackpoints = 0
-        if include_parents and self.parent != None:
-            number_of_trackpoints = self.parent.number_of_trackpoints()
+        if include_parents and self.parent is not None:
+            number_of_trackpoints = self.parent.number_of_trackpoints(include_parents = True)
         return number_of_trackpoints + len(self.trackpoints)
-
 
     def save(self, filename, include_parents=False):
         """
         Saves the trackpoints to a file, including the parent track.
         """
-        if include_parents and self.parent != None:
-            self.save(filename)
+        if include_parents and self.parent is not None:
+            self.parent.save(filename, include_parents=True)
 
         with open(filename, 'a') as fp:
             for trackpoint in self.trackpoints:
-                fp.write(str(trackpoint))
+                fp.write("{tp}\n".format(tp=trackpoint))

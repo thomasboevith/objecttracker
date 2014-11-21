@@ -1,5 +1,8 @@
-class TrackPoint:
-    def __init__(self, row, col, size, color, shape):
+import numpy as np
+
+
+class Trackpoint:
+    def __init__(self, row, col, size=None, color=None, shape=None):
         self.row = row
         self.col = col
         self.size = size
@@ -10,7 +13,7 @@ class TrackPoint:
         """
         Calculate the lengt between two track points.
         """
-        assert(isinstance(tp), TrackPoint)
+        assert(isinstance(tp, Trackpoint))
         return np.sqrt((self.row - tp.row) ** 2 + (self.col - tp.col) ** 2)
 
     def __str__(self):
