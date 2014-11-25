@@ -44,7 +44,7 @@ def view_video(video_filename, video_speed=1):
 
         # Blur image frame by 7,7.
         fgmask = cv2.blur(fgmask, (7,7))
-        
+
         # Erode, then dilate. To remove noise.
         fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, kernel)
 
@@ -61,8 +61,22 @@ def view_video(video_filename, video_speed=1):
 
         LOG.debug("%i connected components."%(np.max(fgmask)))
 
+        # Visualize tracks
+        img = frame
+        for track in enumerate(tracks):
+            lines = []
+            for trackpoint in track.trackpoints:
+                p = [trackpoint.row, trackpoint.col]
+                lines.append(p)
+
+            lines = np.array(lines)
+            cv2.polylines(img, [lines], 0, (0,0,255))
+            for trackpoint in track.trackpoints:
+                cv2.circle(img, (trackpoint.row, trackpoint.col), 0, (0,255,255), -1)
+
         # View the frame.
-        cv2.imshow('frame', fgmask*255)
+        # cv2.imshow('frame', fgmask*255)
+        cv2.imshow('frame', img)
         if cv2.waitKey(video_speed) & 0xFF == ord('q'):
             break
 
