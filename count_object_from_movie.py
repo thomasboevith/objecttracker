@@ -17,6 +17,8 @@ import logging
 import docopt
 import cv2
 import numpy as np
+from objecttracker import noise
+from objecttracker import connected_components
 
 # Define the logger
 LOG = logging.getLogger(__name__)
@@ -33,34 +35,23 @@ LOG.info(args)
 def view_video(video_filename, video_speed=1):
     cap = cv2.VideoCapture(video_filename)
 
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3))
     fgbg = cv2.BackgroundSubtractorMOG()
 
     while(cap.isOpened()):
         ret, frame = cap.read()
 
-        # Extract background.
-        fgmask = fgbg.apply(frame)
-
         # Blur image frame by 7,7.
-        fgmask = cv2.blur(fgmask, (7,7))
+        blurred_frame = cv2.blur(frame, (7,7))
 
-        # Erode, then dilate. To remove noise.
-        fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, kernel)
+        # Extract background.
+        fgmask = fgbg.apply(blurred_frame)
 
-        #gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # Remove noise from the frame.
+        fgmask = noise.remove_noise(fgmask)
 
-        # Find the contours.
-        contours, hierarchy = cv2.findContours(fgmask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
-
-        # Find Create a labelled frame.
-        label = 0
-        for contour in contours:
-            label += 1
-            cv2.drawContours(fgmask, [contour], 0, label, -1)  # -1 fills the image.
-
-        LOG.debug("%i connected components."%(np.max(fgmask)))
-
+        # Get a frame with labelled connected components.
+        fgmask = connected_components.get_labelled_frame(fgmask)
+        
         # Visualize tracks
         img = frame
         for track in enumerate(tracks):
@@ -75,7 +66,6 @@ def view_video(video_filename, video_speed=1):
                 cv2.circle(img, (trackpoint.row, trackpoint.col), 0, (0,255,255), -1)
 
         # View the frame.
-        # cv2.imshow('frame', fgmask*255)
         cv2.imshow('frame', img)
         if cv2.waitKey(video_speed) & 0xFF == ord('q'):
             break
