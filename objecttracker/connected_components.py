@@ -9,7 +9,7 @@ def find_contours(fgmask):
     """
     Finds the contours.
     """
-    contours, hierarchy = cv2.findContours(fgmask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+    contours, hierarchy = cv2.findContours(fgmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     return contours
 
 
@@ -24,7 +24,7 @@ def label_frame(contours, fgmask):
     return fgmask
     
 
-def get_labelled_frame(fgmask):
+def find_labelled_frame(fgmask):
     """
     Inserts labels for a fgmask.
     """
