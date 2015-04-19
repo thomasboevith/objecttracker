@@ -37,11 +37,45 @@ LOG.info(args)
 
 
 def labelled2bgr(labelled_fgmask):
-    bgr_mask = np.zeros((labelled_fgmask.shape[0], labelled_fgmask.shape[1], 3), dtype=np.uint8)
-    colors = color.get_colors(np.max(labelled_fgmask))
+    """
+    Assigns a colour to each a labeled connected component in the
+    labelled mask.
 
-    for object_id in np.arange(np.max(labelled_fgmask)):
-        bgr_mask[np.where(labelled_fgmask == object_id + 1)] = colors[object_id]
+    A labelled mask is a grayscale mask where all the connected
+    components have the same number (labelled):
+    +---------------------+
+    | 0 0 0 0 0 0 0 0 0 0 |
+    | 0 0 1 1 0 0 0 0 0 0 |
+    | 0 0 1 1 0 0 0 0 0 0 |
+    | 0 0 0 1 0 0 0 0 0 0 |
+    | 0 0 0 0 0 0 0 2 2 0 |
+    | 0 0 0 0 0 0 2 2 2 0 |
+    | 0 0 0 0 0 0 0 2 2 0 |
+    | 0 0 0 0 0 0 0 0 0 0 |
+    +---------------------+
+
+    The mask is converted to a rgb mask.
+    Every point with the number 1 in the example above get the same
+    colour in the rgb mask.
+    """
+    # Create an empty bgr mask.
+    bgr_mask = np.zeros((labelled_fgmask.shape[0], labelled_fgmask.shape[1], 3), dtype=np.uint8)
+
+    # Determine the number of connected components / labels.
+    # The labels are assigned with the next number (i+=1), starting with 1,
+    # so the number of labels is the highest (max) label.
+    number_of_connected_components = np.max(labelled_fgmask)
+
+    # If there are no objects in the labelled mask. Just return the empty bgr mask.
+    if number_of_connected_components > 0:
+        # Get an array of colors.
+        colors = color.get_colors(number_of_connected_components)
+
+        # Assign each colour to a label.
+        for object_id in np.arange(np.max(labelled_fgmask)):
+            bgr_mask[np.where(labelled_fgmask == object_id + 1)] = colors[object_id]
+
+    # Return the backgound mask with its new, beautiful colours.
     return bgr_mask
 
 
