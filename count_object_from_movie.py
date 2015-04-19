@@ -131,13 +131,14 @@ def view_video(video_filename, video_speed=1):
         fgmask = noise.remove_noise(fgmask)
 
         # Get a frame with labelled connected components.
-        labelled_fgmask = connected_components.find_labelled_frame(fgmask.copy())
+        labelled_fgmask = connected_components.create_labelled_frame(fgmask)
         labelled_frames.popleft()
         labelled_frames.append(labelled_fgmask)
 
         for cnt in connected_components.find_contours(fgmask):
-            LOG.debug(cv2.contourArea(cnt))
-            if cv2.contourArea(cnt) > 500:
+            contour_area = cv2.contourArea(cnt)
+            LOG.debug(contour_area)
+            if contour_area > 500:
                 cx, cy = get_centroid(cnt)
                 cv2.circle(frame, (int(cx), int(cy)), 5, (0, 255, 255), 3)
 

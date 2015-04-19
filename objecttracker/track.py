@@ -71,7 +71,9 @@ class Track:
         """
         number_of_trackpoints = 0
         if include_parents and self.parent is not None:
-            number_of_trackpoints = self.parent.number_of_trackpoints(include_parents = True)
+            number_of_trackpoints = self.parent.number_of_trackpoints(
+                include_parents=True
+                )
         return number_of_trackpoints + len(self.trackpoints)
 
     def save(self, filename, include_parents=False):
