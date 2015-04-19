@@ -14,7 +14,6 @@ def get_colors(num_colors):
             hue = i/360.
             lightness = (50 + np.random.rand() * 10)/100.
             saturation = (90 + np.random.rand() * 10)/100.
-            colour = (i*255 for i in
-                      colorsys.hls_to_rgb(hue, lightness, saturation))
+            colour = tuple(i*255 for i in colorsys.hls_to_rgb(hue, lightness, saturation))
             colors.append(colour)
     return colors

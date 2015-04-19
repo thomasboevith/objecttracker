@@ -2,6 +2,7 @@
 # coding: utf-8
 import os
 import sys
+import time
 
 __doc__ = """Usage:
     {filename} [options] <video_filename> [--verbose|--debug] [--video-speed=<vs>]
@@ -12,11 +13,14 @@ Options:
     -v, --verbose                     Output less less info.
     --video-speed=<vs>                Speed of the video [default: 1].
     --log-filename=logfilename        Name of the log file.
+    --slow-down                       Slow down when a track is active.
 """.format(filename=os.path.basename(__file__))
 
 import logging
 # Define the logger
 LOG = logging.getLogger(__name__)
+MIN_OBJECT_AREA = 500
+TRACK_MATCH_RADIUS = 100
 
 from collections import deque
 import cv2
@@ -24,6 +28,8 @@ import numpy as np
 from objecttracker import noise
 from objecttracker import connected_components
 from objecttracker import color
+from objecttracker import track
+from objecttracker import trackpoint
 
 import docopt
 args = docopt.docopt(__doc__, version="1.0")
@@ -108,7 +114,7 @@ def get_background(frame, fgbg):
     return fgmask
 
 
-def view_video(video_filename, video_speed=1):
+def view_video(video_filename, video_speed=1, slow_down=False):
     cap = cv2.VideoCapture(video_filename)
 
     fgbg = cv2.BackgroundSubtractorMOG()
@@ -116,7 +122,7 @@ def view_video(video_filename, video_speed=1):
     # For book keeping and later to calculate a track backwards in time...
     frames = deque([None] * 5)
     labelled_frames = deque([None] * 5)
-    tracks = deque([])
+    tracks = []
 
     while(cap.isOpened()):
         ret, frame = cap.read()
@@ -134,33 +140,102 @@ def view_video(video_filename, video_speed=1):
         labelled_fgmask = connected_components.create_labelled_frame(fgmask)
         labelled_frames.popleft()
         labelled_frames.append(labelled_fgmask)
+        bgr_fgmask = labelled2bgr(labelled_fgmask)
 
+
+        # Collect the trackpoints.
+        trackpoints = []
         for cnt in connected_components.find_contours(fgmask):
             contour_area = cv2.contourArea(cnt)
             LOG.debug(contour_area)
-            if contour_area > 500:
+            if contour_area > MIN_OBJECT_AREA:
                 cx, cy = get_centroid(cnt)
+                trackpoints.append(trackpoint.Trackpoint(cx, cy, size=contour_area))
+
+                # Add a small circle in the middle of the object
+                # on the main frame (computer?)
                 cv2.circle(frame, (int(cx), int(cy)), 5, (0, 255, 255), 3)
+                cv2.circle(frame, (int(cx), int(cy)), TRACK_MATCH_RADIUS, (0, 255, 0), 1)
 
-        bgr_fgmask = labelled2bgr(labelled_fgmask)
+        # Match trackpoints with existing tracks.
+        if len(tracks) == 0:
+            # No tracks. All trackpoints are therefore added to the list.
+            while len(trackpoints) > 0:
+                t = track.Track()
+                t.append(trackpoints.pop())
+                tracks.append(t)
+        else:
+            while len(trackpoints) > 0:
+                tp = trackpoints.pop()
+                min_length = 10**10
+                min_index = None
 
-        # Visualize tracks
-        img = frame
-#        for track in enumerate(tracks):
-#            lines = []
-#            for trackpoint in track.trackpoints:
-#                p = [trackpoint.row, trackpoint.col]
-#                lines.append(p)
+                # Find closest existing track.
+                for i, t in enumerate(tracks):
+                    last_trackpoint = t.trackpoints[-1]
+                    
+                    # Length to current track.
+                    length = tp.length_to(last_trackpoint)
 
-#            lines = np.array(lines)
-#            cv2.polylines(img, [lines], 0, (0,0,255))
-#            for trackpoint in track.trackpoints:
-#                cv2.circle(img, (trackpoint.row, trackpoint.col), 0, (0,255,255), -1)
+                    # Find minimum length and index.
+                    last_min = min_length
+                    if length < min_length:
+                        min_length = length
+                        min_index = i
+                        min_track = t
+
+                # Check that the point matches the minimum.
+                add_min = False
+                if min_index != None:
+                    if min_length < TRACK_MATCH_RADIUS:
+                        add_min = True
+
+                        expected_next_point = min_track.expected_next_point()
+                        if expected_next_point != None:
+                            min_expected_length = tp.length_to(expected_next_point)
+                            expected_row, expected_col = expected_next_point.row, expected_next_point.col
+                            cv2.circle(frame, (int(expected_row), int(expected_col)), TRACK_MATCH_RADIUS, (0, 0, 255), 1)
+
+                            if min_expected_length < TRACK_MATCH_RADIUS:
+                                add_min = True
+
+                    if add_min:
+                        tracks[min_index].append(tp)
+
+                if not add_min:
+                    t = track.Track()
+                    t.append(tp)
+                    tracks.append(t)
+
+        for t in tracks:
+            t.incr_age()
+
+            lines = np.array([[tp.row, tp.col] for tp in t.trackpoints])
+            thickness_factor = 1.0/(t.age)
+            cv2.polylines(frame, np.int32([lines]), 0, (255,0,255), thickness=int(3*thickness_factor))
+
+            for tp in t.trackpoints:
+                cv2.circle(frame, (int(tp.row), int(tp.col)), 5, (255,0,255), 1)
+            
+            if t.age > 3:
+                if t.length() < 10:
+                    tracks.remove(t)
+                    continue
+
+            if t.age > 10:
+                tracks.remove(t)
+
+        if len(tracks) > 0:
+            LOG.debug(" ### ".join([str(t) for t in tracks]))
+
+            if slow_down:
+                LOG.debug("Sleeping")
+                time.sleep(0.2)
 
         # View the frame.
-        cv2.imshow('fgmask', fgmask)
-        cv2.imshow('label', labelled_fgmask)
-        cv2.imshow('bgr_fgmask', bgr_fgmask)
+        #cv2.imshow('fgmask', fgmask)
+        #cv2.imshow('label', labelled_fgmask)
+        #cv2.imshow('bgr_fgmask', bgr_fgmask)
         cv2.imshow('frame', frame)
         if cv2.waitKey(video_speed) & 0xFF == ord('q'):
             break
@@ -169,4 +244,4 @@ def view_video(video_filename, video_speed=1):
     cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    view_video(args['<video_filename>'], int(args["--video-speed"]))
+    view_video(args['<video_filename>'], int(args["--video-speed"]), args["--slow-down"])

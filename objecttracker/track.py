@@ -7,6 +7,19 @@ class Track:
         self.parent = None
         self.trackpoints = []
         self.name = None
+        self.age = 0
+
+    def __str__(self):
+        return "Length: '%i'. Age: '%i'. Avg size: '%f'. Avg. length between trackpoints: '%f'."%(self.length(), self.age, self.size_avg(), self.length_avg())
+
+    def size_avg(self):
+        return np.average([tp.size for tp in self.trackpoints])
+
+    def incr_age(self):
+        self.age += 1
+        
+    def append(self, trackpoint):
+        self.add_trackpoint(trackpoint)
 
     def add_trackpoint(self, trackpoint):
         """
@@ -14,6 +27,7 @@ class Track:
         """
         assert(isinstance(trackpoint, Trackpoint))
         self.trackpoints.append(trackpoint)
+        self.age = 0
 
     def set_parent(self, parent):
         """
@@ -65,6 +79,12 @@ class Track:
             zip(self.trackpoints, self.trackpoints[1:])
         ))
 
+    def length_avg(self, include_parents=False):
+        number_of_trackpoints = self.number_of_trackpoints(include_parents)
+        if number_of_trackpoints < 2:
+            return 0
+        return self.length(include_parents) / number_of_trackpoints - 1 
+
     def number_of_trackpoints(self, include_parents=False):
         """
         Returns the number of trackpoints for the track.
@@ -76,6 +96,22 @@ class Track:
                 )
         return number_of_trackpoints + len(self.trackpoints)
 
+
+    def expected_next_point(self):
+        # TODO: Handle inherited trackpoints.
+        number_of_trackpoints = self.number_of_trackpoints()
+        if number_of_trackpoints < 2:
+            return None
+
+        second_last_tp, last_tp = self.trackpoints[-2:]
+        expected_next_point = Trackpoint((2*last_tp.row - second_last_tp.row),
+                                         (2*last_tp.col - second_last_tp.col))
+        return expected_next_point
+        
+        
+        
+        
+
     def save(self, filename, include_parents=False):
         """
         Saves the trackpoints to a file, including the parent track.
@@ -86,3 +122,4 @@ class Track:
         with open(filename, 'a') as fp:
             for trackpoint in self.trackpoints:
                 fp.write("{tp}\n".format(tp=trackpoint))
+
