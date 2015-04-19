@@ -114,9 +114,9 @@ def view_video(video_filename, video_speed=1):
     fgbg = cv2.BackgroundSubtractorMOG()
 
     # For book keeping and later to calculate a track backwards in time...
-    frames = decue([None] * 5)
-    labelled_frames = decue([None] * 5)
-    tracks = decue([])
+    frames = deque([None] * 5)
+    labelled_frames = deque([None] * 5)
+    tracks = deque([])
 
     while(cap.isOpened()):
         ret, frame = cap.read()
