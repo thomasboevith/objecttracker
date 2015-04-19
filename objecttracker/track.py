@@ -104,13 +104,25 @@ class Track:
             return None
 
         second_last_tp, last_tp = self.trackpoints[-2:]
-        expected_next_point = Trackpoint((2*last_tp.row - second_last_tp.row),
-                                         (2*last_tp.col - second_last_tp.col))
+        expected_next_point = Trackpoint((2*last_tp.x - second_last_tp.x),
+                                         (2*last_tp.y - second_last_tp.y))
         return expected_next_point
+
         
-        
-        
-        
+    def kalman(self, trackpoint):
+        assert(isinstance(trackpoint, Trackpoint))
+
+        expected_tp = self.expected_next_point()
+        if expected_tp != None:
+            x = int((expected_tp.x + trackpoint.x)/2.0)
+            y = int((expected_tp.y + trackpoint.y)/2.0)
+
+            new_trackpoint = Trackpoint(None, None)
+            new_trackpoint.__dict__ = trackpoint.__dict__
+            new_trackpoint.x = x
+            new_trackpoint.y = y
+            return new_trackpoint
+        return trackpoint
 
     def save(self, filename, include_parents=False):
         """

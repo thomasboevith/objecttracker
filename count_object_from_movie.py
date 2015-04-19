@@ -142,7 +142,6 @@ def view_video(video_filename, video_speed=1, slow_down=False):
         labelled_frames.append(labelled_fgmask)
         bgr_fgmask = labelled2bgr(labelled_fgmask)
 
-
         # Collect the trackpoints.
         trackpoints = []
         for cnt in connected_components.find_contours(fgmask):
@@ -169,53 +168,62 @@ def view_video(video_filename, video_speed=1, slow_down=False):
                 tp = trackpoints.pop()
                 min_length = 10**10
                 min_index = None
+                min_track = None
+                min_tp = None
 
                 # Find closest existing track.
                 for i, t in enumerate(tracks):
-                    last_trackpoint = t.trackpoints[-1]
-                    
-                    # Length to current track.
-                    length = tp.length_to(last_trackpoint)
+                    # Find the point, based on the current track.
+                    # Smoothed to the current track.
+                    tp_k = tp #t.kalman(tp)
 
-                    # Find minimum length and index.
-                    last_min = min_length
+                    # The last track point in the current track.
+                    last_trackpoint = t.trackpoints[-1]
+
+                    # Length to last point in current track.
+                    length = tp_k.length_to(last_trackpoint)
+
+                    # Find smallest length and index.
                     if length < min_length:
                         min_length = length
                         min_index = i
                         min_track = t
+                        min_tp = tp_k
 
-                # Check that the point matches the minimum.
-                add_min = False
+                # Check that the point matches the minimum requirements.
+                matching_track_found = False
+
+                # Were there any minimum at all?
                 if min_index != None:
+                    # Was the minimum within the an acceptable range?
                     if min_length < TRACK_MATCH_RADIUS:
-                        add_min = True
+                        matching_track_found = True
 
-                        expected_next_point = min_track.expected_next_point()
-                        if expected_next_point != None:
-                            min_expected_length = tp.length_to(expected_next_point)
-                            expected_row, expected_col = expected_next_point.row, expected_next_point.col
-                            cv2.circle(frame, (int(expected_row), int(expected_col)), TRACK_MATCH_RADIUS, (0, 0, 255), 1)
+                    # TODO:
+                    # Was the direction OK?
+                    # Did the object slow down, and change direction?
+                    # Did size match?
 
-                            if min_expected_length < TRACK_MATCH_RADIUS:
-                                add_min = True
+                if matching_track_found:
+                    tp = min_tp
+                else:
+                    # Create a new track and append it.
+                    min_index = len(tracks)
+                    tracks.append(track.Track())
 
-                    if add_min:
-                        tracks[min_index].append(tp)
+                # Append the track poin to the relevant track.
+                tracks[min_index].append(tp)
 
-                if not add_min:
-                    t = track.Track()
-                    t.append(tp)
-                    tracks.append(t)
 
         for t in tracks:
             t.incr_age()
 
-            lines = np.array([[tp.row, tp.col] for tp in t.trackpoints])
+            lines = np.array([[tp.x, tp.y] for tp in t.trackpoints])
             thickness_factor = 1.0/(t.age)
             cv2.polylines(frame, np.int32([lines]), 0, (255,0,255), thickness=int(3*thickness_factor))
 
             for tp in t.trackpoints:
-                cv2.circle(frame, (int(tp.row), int(tp.col)), 5, (255,0,255), 1)
+                cv2.circle(frame, (int(tp.x), int(tp.y)), 5, (0,255,255), 1)
             
             if t.age > 3:
                 if t.length() < 10:
@@ -223,13 +231,21 @@ def view_video(video_filename, video_speed=1, slow_down=False):
                     continue
 
             if t.age > 10:
+                first_tp, last_tp = t.trackpoints[0], t.trackpoints[-1]
+                frame_width = frame.shape[0]
+                length = first_tp.length_to(last_tp)
+                if length > 0.5*frame_width:
+                    if t.size_avg() < 10000:
+                        print "Bike"
+                    else:
+                        print "Car"
                 tracks.remove(t)
 
         if len(tracks) > 0:
             LOG.debug(" ### ".join([str(t) for t in tracks]))
 
             if slow_down:
-                LOG.debug("Sleeping")
+                LOG.debug("Sleeping for 0.2s")
                 time.sleep(0.2)
 
         # View the frame.
@@ -237,6 +253,7 @@ def view_video(video_filename, video_speed=1, slow_down=False):
         #cv2.imshow('label', labelled_fgmask)
         #cv2.imshow('bgr_fgmask', bgr_fgmask)
         cv2.imshow('frame', frame)
+
         if cv2.waitKey(video_speed) & 0xFF == ord('q'):
             break
 
