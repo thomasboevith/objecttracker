@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# coding: utf-8
 import os
 import sys
 
@@ -14,44 +15,53 @@ Options:
 """.format(filename=os.path.basename(__file__))
 
 import logging
-import docopt
+# Define the logger
+LOG = logging.getLogger(__name__)
+
 import cv2
 import numpy as np
 from objecttracker import noise
 from objecttracker import connected_components
 from objecttracker import color
 
-# Define the logger
-LOG = logging.getLogger(__name__)
-
+import docopt
 args = docopt.docopt(__doc__, version="1.0")
+
 if args["--debug"]:
-    logging.basicConfig( filename=args["--log-filename"], level=logging.DEBUG )
+    logging.basicConfig(filename=args["--log-filename"], level=logging.DEBUG)
 elif args["--verbose"]:
-    logging.basicConfig( filename=args["--log-filename"], level=logging.INFO )
+    logging.basicConfig(filename=args["--log-filename"], level=logging.INFO)
 else:
-    logging.basicConfig( filename=args["--log-filename"], level=logging.WARNING )
+    logging.basicConfig(filename=args["--log-filename"], level=logging.WARNING)
 LOG.info(args)
+
 
 def labelled2bgr(labelled_fgmask):
     bgr_mask = np.zeros((labelled_fgmask.shape[0], labelled_fgmask.shape[1], 3), dtype=np.uint8)
     colors = color.get_colors(np.max(labelled_fgmask))
 
     for object_id in np.arange(np.max(labelled_fgmask)):
-        bgr_mask[np.where(labelled_fgmask == object_id+1)] = colors[object_id]
+        bgr_mask[np.where(labelled_fgmask == object_id + 1)] = colors[object_id]
     return bgr_mask
-        
 
-def get_centroid(cnt):
-    moments = cv2.moments(cnt)
+
+def get_centroid(contour):
+    """
+    Gets the coordinates of the center of a contour.
+    """
+    moments = cv2.moments(contour)
     if moments['m00'] != 0.0:
-        cx = moments['m10']/moments['m00']
-        cy = moments['m01']/moments['m00']
-        centroid = (cx,cy)
+        cx = moments['m10'] / moments['m00']
+        cy = moments['m01'] / moments['m00']
+        centroid = (cx, cy)
         return centroid
 
-def get_bounding_box(cnt):
-    return cv2.boundingRect(cnt)
+
+def get_bounding_box(contour):
+    """
+    Gets a bounding box around a contour"
+    """
+    return cv2.boundingRect(contour)
 
 
 def view_video(video_filename, video_speed=1):
@@ -59,19 +69,19 @@ def view_video(video_filename, video_speed=1):
 
     fgbg = cv2.BackgroundSubtractorMOG()
 
-    frames = [None]*5
-    labelled_frames = [None]*5
+    frames = [None] * 5
+    labelled_frames = [None] * 5
 
     tracks = []
 
     while(cap.isOpened()):
         ret, frame = cap.read()
-        
+
         frames = frames[1:]
         frames.append(frame)
-        
+
         # Blur image frame by 7,7.
-        blurred_frame = cv2.blur(frame, (7,7))
+        blurred_frame = cv2.blur(frame, (7, 7))
 
         # Extract background.
         fgmask = fgbg.apply(blurred_frame)
@@ -91,8 +101,7 @@ def view_video(video_filename, video_speed=1):
             LOG.debug(cv2.contourArea(cnt))
             if cv2.contourArea(cnt) > 500:
                 cx, cy = get_centroid(cnt)
-                cv2.circle(frame, (int(cx), int(cy)), 5, (0,255,255), 3)
-                
+                cv2.circle(frame, (int(cx), int(cy)), 5, (0, 255, 255), 3)
 
         bgr_fgmask = labelled2bgr(labelled_fgmask)
 
