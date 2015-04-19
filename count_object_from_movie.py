@@ -18,6 +18,7 @@ import logging
 # Define the logger
 LOG = logging.getLogger(__name__)
 
+from collections import deque
 import cv2
 import numpy as np
 from objecttracker import noise
@@ -98,37 +99,40 @@ def get_bounding_box(contour):
     return cv2.boundingRect(contour)
 
 
+def get_background(frame, fgbg):
+    # Blur image frame by 7,7.
+    blurred_frame = cv2.blur(frame, (7, 7))
+
+    # Extract background.
+    fgmask = fgbg.apply(blurred_frame)
+    return fgmask
+
+
 def view_video(video_filename, video_speed=1):
     cap = cv2.VideoCapture(video_filename)
 
     fgbg = cv2.BackgroundSubtractorMOG()
 
-    frames = [None] * 5
-    labelled_frames = [None] * 5
-
-    tracks = []
+    # For book keeping and later to calculate a track backwards in time...
+    frames = decue([None] * 5)
+    labelled_frames = decue([None] * 5)
+    tracks = decue([])
 
     while(cap.isOpened()):
         ret, frame = cap.read()
-
-        frames = frames[1:]
+        
         frames.append(frame)
+        frames.popleft() # Returns and removes the oldest frame in the list.
 
-        # Blur image frame by 7,7.
-        blurred_frame = cv2.blur(frame, (7, 7))
-
-        # Extract background.
-        fgmask = fgbg.apply(blurred_frame)
+        # Get the background from the frame.
+        fgmask = get_background(frame, fgbg)
 
         # Remove noise from the frame.
         fgmask = noise.remove_noise(fgmask)
 
-        kernel = np.ones((7, 7), np.uint8)
-        fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, kernel, iterations=5)
-
         # Get a frame with labelled connected components.
         labelled_fgmask = connected_components.find_labelled_frame(fgmask.copy())
-        labelled_frames = labelled_frames[1:]
+        labelled_frames.popleft()
         labelled_frames.append(labelled_fgmask)
 
         for cnt in connected_components.find_contours(fgmask):
