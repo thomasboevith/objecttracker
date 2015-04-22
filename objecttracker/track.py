@@ -10,7 +10,7 @@ class Track:
         self.age = 0
 
     def __str__(self):
-        return "Length: '%i'. Age: '%i'. Avg size: '%f'. Avg. length between trackpoints: '%f'."%(self.length(), self.age, self.size_avg(), self.length_avg())
+        return "Length: '%i'. Age: '%i'. Avg size: '%f'. Avg. length between trackpoints: '%f'."%(self.total_length(), self.age, self.size_avg(), self.length_avg())
 
     def size_avg(self):
         return np.average([tp.size for tp in self.trackpoints])
@@ -51,7 +51,7 @@ class Track:
         t.set_parent(self)
         return t
 
-    def length(self, include_parents=False):
+    def total_length(self, include_parents=False):
         """
         The length of a track, including its parent track.
 
@@ -67,7 +67,7 @@ class Track:
         parent_length = 0
         if include_parents and self.parent is not None \
            and len(self.parent.trackpoints) > 0:
-            parent_length += self.parent.length()
+            parent_length += self.parent.total_length(include_parents)
 
             # The length between the last parent tracpoint and the this
             # first trackpoint.
@@ -83,7 +83,18 @@ class Track:
         number_of_trackpoints = self.number_of_trackpoints(include_parents)
         if number_of_trackpoints < 2:
             return 0
-        return self.length(include_parents) / number_of_trackpoints - 1 
+        return self.total_length(include_parents) / number_of_trackpoints - 1 
+
+    def sum_size(self, include_parents=False):
+        size = 0
+        if self.parent != None and include_parents:
+            size += self.parent.sum_size(include_parents)
+        size += sum([tp.size for tp in self.trackpoints])
+        return size
+        
+
+    def avg_size(self, include_parents=False):
+        return self.sum_size(include_parents) / self.number_of_trackpoints(include_parents)
 
     def number_of_trackpoints(self, include_parents=False):
         """
@@ -123,6 +134,9 @@ class Track:
             new_trackpoint.y = y
             return new_trackpoint
         return trackpoint
+
+    def length_to(self, trackpoint):
+        return self.trackpoints[-1].length_to(trackpoint)
 
     def save(self, filename, include_parents=False):
         """

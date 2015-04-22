@@ -16,12 +16,6 @@ Options:
     --slow-down                       Slow down when a track is active.
 """.format(filename=os.path.basename(__file__))
 
-import logging
-# Define the logger
-LOG = logging.getLogger(__name__)
-MIN_OBJECT_AREA = 500
-TRACK_MATCH_RADIUS = 100
-
 from collections import deque
 import cv2
 import numpy as np
@@ -30,6 +24,10 @@ from objecttracker import connected_components
 from objecttracker import color
 from objecttracker import track
 from objecttracker import trackpoint
+
+import logging
+# Define the logger
+LOG = logging.getLogger(__name__)
 
 import docopt
 args = docopt.docopt(__doc__, version="1.0")
@@ -42,6 +40,9 @@ else:
     logging.basicConfig(filename=args["--log-filename"], level=logging.WARNING)
 LOG.info(args)
 
+MIN_OBJECT_AREA = 500
+TRACK_MATCH_RADIUS = 100
+SIZE_MATCH_RATIO = 0.5
 
 def labelled2bgr(labelled_fgmask):
     """
@@ -115,6 +116,8 @@ def get_background(frame, fgbg):
 
 
 def view_video(video_filename, video_speed=1, slow_down=False):
+    counter = {'b': 0, 'c': 0}
+
     cap = cv2.VideoCapture(video_filename)
 
     fgbg = cv2.BackgroundSubtractorMOG()
@@ -156,63 +159,49 @@ def view_video(video_filename, video_speed=1, slow_down=False):
                 cv2.circle(frame, (int(cx), int(cy)), 5, (0, 255, 255), 3)
                 cv2.circle(frame, (int(cx), int(cy)), TRACK_MATCH_RADIUS, (0, 255, 0), 1)
 
-        # Match trackpoints with existing tracks.
-        if len(tracks) == 0:
-            # No tracks. All trackpoints are therefore added to the list.
-            while len(trackpoints) > 0:
-                t = track.Track()
-                t.append(trackpoints.pop())
-                tracks.append(t)
-        else:
-            while len(trackpoints) > 0:
-                tp = trackpoints.pop()
-                min_length = 10**10
-                min_index = None
-                min_track = None
-                min_tp = None
+        while len(trackpoints) > 0:
+            tp = trackpoints.pop()
+            min_length = 10**10
+            min_index = None
 
-                # Find closest existing track.
-                for i, t in enumerate(tracks):
-                    # Find the point, based on the current track.
-                    # Smoothed to the current track.
-                    tp_k = tp #t.kalman(tp)
+            cv2.circle(frame, (int(tp.x), int(tp.y)), 3, (0,0,255), 1)
 
-                    # The last track point in the current track.
-                    last_trackpoint = t.trackpoints[-1]
+            # Find closest existing track.
+            for i, t in enumerate(tracks):
+                # Length to last point in current track.
+                length = t.length_to(tp)
+                cv2.putText(frame, "L: %.2f S_tp: %.2f S_t: %.2f"%(length, tp.size, t.avg_size()), (int(tp.x), int(tp.y)), cv2.FONT_HERSHEY_PLAIN, 1, (255, 100, 100), thickness=1)
 
-                    # Length to last point in current track.
-                    length = tp_k.length_to(last_trackpoint)
+                # Find smallest length and index.
+                if length < min_length:
+                    # import pdb; pdb.set_trace()
+                    min_length = length
+                    min_index = i
 
-                    # Find smallest length and index.
-                    if length < min_length:
-                        min_length = length
-                        min_index = i
-                        min_track = t
-                        min_tp = tp_k
+            # Check that the point matches the minimum requirements.
+            matching_track_found = False
 
-                # Check that the point matches the minimum requirements.
-                matching_track_found = False
-
-                # Were there any minimum at all?
-                if min_index != None:
-                    # Was the minimum within the an acceptable range?
-                    if min_length < TRACK_MATCH_RADIUS:
+            # Were there any minimum at all?
+            if min_index != None:
+                # Was the minimum within the an acceptable range?
+                if tracks[min_index].length_to(tp) < TRACK_MATCH_RADIUS:
+                    if tp.size * (1-SIZE_MATCH_RATIO) < tracks[min_index].avg_size() < tp.size * (1+SIZE_MATCH_RATIO):
                         matching_track_found = True
 
-                    # TODO:
-                    # Was the direction OK?
-                    # Did the object slow down, and change direction?
-                    # Did size match?
+                # TODO:
+                # Was the direction OK?
+                # Did the object slow down, and change direction?
+                # Did size match?
 
-                if matching_track_found:
-                    tp = min_tp
-                else:
-                    # Create a new track and append it.
-                    min_index = len(tracks)
-                    tracks.append(track.Track())
+            if matching_track_found:
+                tp = tracks[min_index].kalman(tp)
+            else:
+                # Create a new track and append it.
+                min_index = len(tracks)
+                tracks.append(track.Track())
 
-                # Append the track poin to the relevant track.
-                tracks[min_index].append(tp)
+            # Append the track poin to the relevant track.
+            tracks[min_index].append(tp)
 
 
         for t in tracks:
@@ -226,7 +215,7 @@ def view_video(video_filename, video_speed=1, slow_down=False):
                 cv2.circle(frame, (int(tp.x), int(tp.y)), 5, (0,255,255), 1)
             
             if t.age > 3:
-                if t.length() < 10:
+                if t.total_length() < 10:
                     tracks.remove(t)
                     continue
 
@@ -236,9 +225,11 @@ def view_video(video_filename, video_speed=1, slow_down=False):
                 length = first_tp.length_to(last_tp)
                 if length > 0.5*frame_width:
                     if t.size_avg() < 10000:
+                        counter['b'] += 1
                         print "Bike"
                     else:
                         print "Car"
+                        counter['c'] += 1
                 tracks.remove(t)
 
         if len(tracks) > 0:
@@ -253,12 +244,14 @@ def view_video(video_filename, video_speed=1, slow_down=False):
         #cv2.imshow('label', labelled_fgmask)
         #cv2.imshow('bgr_fgmask', bgr_fgmask)
         cv2.imshow('frame', frame)
+        print counter
 
         if cv2.waitKey(video_speed) & 0xFF == ord('q'):
             break
 
     cap.release()
     cv2.destroyAllWindows()
+    print counter
 
 if __name__ == "__main__":
     view_video(args['<video_filename>'], int(args["--video-speed"]), args["--slow-down"])
