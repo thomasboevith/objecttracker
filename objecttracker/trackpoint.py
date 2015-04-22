@@ -1,5 +1,5 @@
 import numpy as np
-
+import sys
 
 class Trackpoint:
     def __init__(self, x, y, size=None, color=None, shape=None):
@@ -34,3 +34,24 @@ class Trackpoint:
                                                               size=self.size,
                                                               color=self.color,
                                                               shape=self.shape)
+    def sort_by_closest(self, tracks):
+        tracks.sort(key=lambda t: t.length_to(self))
+"""
+
+        min_length = sys.maxsize
+        min_index = None
+
+        # Find closest existing track.
+        for i, t in enumerate(tracks):
+            # Length to last point in current track.
+            length = t.length_to(self)
+            # cv2.circle(frame, (int(tp.x), int(tp.y)), 3, (0,0,255), 1)
+            # cv2.putText(frame, "L: %.2f S_tp: %.2f S_t: %.2f"%(length, tp.size, t.avg_size()), (int(tp.x), int(tp.y)), cv2.FONT_HERSHEY_PLAIN, 1, (255, 100, 100), thickness=1)
+
+            # Find smallest length and index.
+            if length < min_length:
+                # import pdb; pdb.set_trace()
+                min_length = length
+                min_index = i
+
+"""

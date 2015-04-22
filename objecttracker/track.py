@@ -1,5 +1,17 @@
 import numpy as np
+import cv2
 from trackpoint import Trackpoint
+
+TRACK_MATCH_RADIUS = 100
+SIZE_MATCH_RATIO = 0.5
+
+def diff_degrees(A, B):
+    diff = A - B
+    if diff > 180:
+        diff -= 360
+    elif diff < -180:
+        diff += 360
+    return abs(diff)
 
 
 class Track:
@@ -148,4 +160,44 @@ class Track:
         with open(filename, 'a') as fp:
             for trackpoint in self.trackpoints:
                 fp.write("{tp}\n".format(tp=trackpoint))
+
+    def direction(self, deg=False):
+        if self.number_of_trackpoints() < 2:
+            return None
+        return self.trackpoints[-2].direction_to(self.trackpoints[-1], deg)
+
+    def match(self, trackpoint, frame=None):
+        if frame != None:
+            # Add a small circle in the middle of the object
+            # on the main frame (computer?)
+            cv2.circle(frame, (int(trackpoint.x), int(trackpoint.y)), 0, (0, 255, 0), thickness=2)
+            tp_kalman = self.kalman(trackpoint)
+            cv2.circle(frame, (int(tp_kalman.x), int(tp_kalman.y)), 1, (255, 255, 255), thickness=2)
+
+            for radius in range(10, TRACK_MATCH_RADIUS+1, 20):
+                cv2.circle(frame, (int(trackpoint.x), int(trackpoint.y)), radius, (0, 255, 0), thickness=1)
+
+        if self.length_to(trackpoint) < TRACK_MATCH_RADIUS:        
+            if trackpoint.size * (1-SIZE_MATCH_RATIO) < self.avg_size() < trackpoint.size * (1+SIZE_MATCH_RATIO):
+                direction = self.direction()
+                if direction == None or diff_degrees(trackpoint.direction_to(self.kalman(trackpoint), deg=True), direction) < 30:
+                    return True
+                elif self.length_to(self.kalman(trackpoint)) < 10:
+                    return True
+                else:
+                    # Did object slow down/have a really small speed before changing direction?
+                    pass
+        return False
+
+
+    def draw(self, frame):
+        # Track lines.
+        lines = np.array([[tp.x, tp.y] for tp in self.trackpoints])
+        thickness_factor = 1.0/(self.age)
+        cv2.polylines(frame, np.int32([lines]), 0, (255,0,255), thickness=int(3*thickness_factor))
+
+        # Points i each line.
+        for tp in self.trackpoints:
+            cv2.circle(frame, (int(tp.x), int(tp.y)), 5, (0,255,255), 1)
+
 

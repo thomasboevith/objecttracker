@@ -41,8 +41,7 @@ else:
 LOG.info(args)
 
 MIN_OBJECT_AREA = 500
-TRACK_MATCH_RADIUS = 100
-SIZE_MATCH_RATIO = 0.5
+draw_counter = {'bike': 100, 'car': 100}
 
 def labelled2bgr(labelled_fgmask):
     """
@@ -154,66 +153,26 @@ def view_video(video_filename, video_speed=1, slow_down=False):
                 cx, cy = get_centroid(cnt)
                 trackpoints.append(trackpoint.Trackpoint(cx, cy, size=contour_area))
 
-                # Add a small circle in the middle of the object
-                # on the main frame (computer?)
-                cv2.circle(frame, (int(cx), int(cy)), 5, (0, 255, 255), 3)
-                cv2.circle(frame, (int(cx), int(cy)), TRACK_MATCH_RADIUS, (0, 255, 0), 1)
 
         while len(trackpoints) > 0:
             tp = trackpoints.pop()
-            min_length = 10**10
-            min_index = None
 
-            cv2.circle(frame, (int(tp.x), int(tp.y)), 3, (0,0,255), 1)
-
-            # Find closest existing track.
-            for i, t in enumerate(tracks):
-                # Length to last point in current track.
-                length = t.length_to(tp)
-                cv2.putText(frame, "L: %.2f S_tp: %.2f S_t: %.2f"%(length, tp.size, t.avg_size()), (int(tp.x), int(tp.y)), cv2.FONT_HERSHEY_PLAIN, 1, (255, 100, 100), thickness=1)
-
-                # Find smallest length and index.
-                if length < min_length:
-                    # import pdb; pdb.set_trace()
-                    min_length = length
-                    min_index = i
-
-            # Check that the point matches the minimum requirements.
-            matching_track_found = False
-
-            # Were there any minimum at all?
-            if min_index != None:
-                # Was the minimum within the an acceptable range?
-                if tracks[min_index].length_to(tp) < TRACK_MATCH_RADIUS:
-                    if tp.size * (1-SIZE_MATCH_RATIO) < tracks[min_index].avg_size() < tp.size * (1+SIZE_MATCH_RATIO):
-                        matching_track_found = True
-
-                # TODO:
-                # Was the direction OK?
-                # Did the object slow down, and change direction?
-                # Did size match?
-
-            if matching_track_found:
-                tp = tracks[min_index].kalman(tp)
-            else:
-                # Create a new track and append it.
-                min_index = len(tracks)
-                tracks.append(track.Track())
-
-            # Append the track poin to the relevant track.
-            tracks[min_index].append(tp)
-
+            # Sorts the list of tracks. The closest first.
+            tp.sort_by_closest(tracks)
+            
+            for t in tracks:
+                if t.match(tp, frame):
+                    t.append(t.kalman(tp))
+                    break
+            
+            t = track.Track()
+            t.append(tp)
+            tracks.append(t)
 
         for t in tracks:
             t.incr_age()
+            t.draw(frame)
 
-            lines = np.array([[tp.x, tp.y] for tp in t.trackpoints])
-            thickness_factor = 1.0/(t.age)
-            cv2.polylines(frame, np.int32([lines]), 0, (255,0,255), thickness=int(3*thickness_factor))
-
-            for tp in t.trackpoints:
-                cv2.circle(frame, (int(tp.x), int(tp.y)), 5, (0,255,255), 1)
-            
             if t.age > 3:
                 if t.total_length() < 10:
                     tracks.remove(t)
@@ -225,33 +184,43 @@ def view_video(video_filename, video_speed=1, slow_down=False):
                 length = first_tp.length_to(last_tp)
                 if length > 0.5*frame_width:
                     if t.size_avg() < 10000:
+                        draw_counter['bike'] = 0
                         counter['b'] += 1
-                        print "Bike"
                     else:
-                        print "Car"
+                        draw_counter['car'] = 0
                         counter['c'] += 1
+                    print counter
                 tracks.remove(t)
+
+        if draw_counter['bike'] < 50:
+            cv2.putText(frame, "BIKE", (10,100), cv2.FONT_HERSHEY_PLAIN, 2, (255, 255, 255), thickness=2)
+            draw_counter['bike'] += 1
+
+        if draw_counter['car'] < 50:
+            cv2.putText(frame, "CAR", (10,100), cv2.FONT_HERSHEY_PLAIN, 2, (255, 255, 255), thickness=2)
+            draw_counter['car'] += 1
 
         if len(tracks) > 0:
             LOG.debug(" ### ".join([str(t) for t in tracks]))
 
             if slow_down:
                 LOG.debug("Sleeping for 0.2s")
-                time.sleep(0.2)
+                time.sleep(0.5)
 
         # View the frame.
         #cv2.imshow('fgmask', fgmask)
         #cv2.imshow('label', labelled_fgmask)
         #cv2.imshow('bgr_fgmask', bgr_fgmask)
         cv2.imshow('frame', frame)
-        print counter
 
         if cv2.waitKey(video_speed) & 0xFF == ord('q'):
             break
 
+    print "FIN"
+    print counter
+
     cap.release()
     cv2.destroyAllWindows()
-    print counter
 
 if __name__ == "__main__":
     view_video(args['<video_filename>'], int(args["--video-speed"]), args["--slow-down"])
