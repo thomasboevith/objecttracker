@@ -39,7 +39,7 @@ class Track:
         """
         assert(isinstance(trackpoint, Trackpoint))
         self.trackpoints.append(trackpoint)
-        self.age = 0
+        self.age = 1
 
     def set_parent(self, parent):
         """
@@ -140,8 +140,7 @@ class Track:
             x = int((expected_tp.x + trackpoint.x)/2.0)
             y = int((expected_tp.y + trackpoint.y)/2.0)
 
-            new_trackpoint = Trackpoint(None, None)
-            new_trackpoint.__dict__ = trackpoint.__dict__
+            new_trackpoint = trackpoint.copy()
             new_trackpoint.x = x
             new_trackpoint.y = y
             return new_trackpoint
@@ -171,33 +170,53 @@ class Track:
             # Add a small circle in the middle of the object
             # on the main frame (computer?)
             cv2.circle(frame, (int(trackpoint.x), int(trackpoint.y)), 0, (0, 255, 0), thickness=2)
-            tp_kalman = self.kalman(trackpoint)
-            cv2.circle(frame, (int(tp_kalman.x), int(tp_kalman.y)), 1, (255, 255, 255), thickness=2)
+            tp_k = self.kalman(trackpoint)
+            kalman_color = (255, 255, 255)
+            cv2.circle(frame, (int(tp_k.x), int(tp_k.y)), 1, kalman_color, thickness=1)
+            cv2.circle(frame, (int(tp_k.x), int(tp_k.y)), 15, kalman_color, thickness=2)
+            lines = np.array([[trackpoint.x, trackpoint.y], [tp_k.x, tp_k.y]])
+            cv2.polylines(frame, np.int32([lines]), 0, kalman_color, thickness=1)
 
             for radius in range(10, TRACK_MATCH_RADIUS+1, 20):
                 cv2.circle(frame, (int(trackpoint.x), int(trackpoint.y)), radius, (0, 255, 0), thickness=1)
 
-        if self.length_to(trackpoint) < TRACK_MATCH_RADIUS:        
+        if self.length_to(trackpoint) < TRACK_MATCH_RADIUS:
             if trackpoint.size * (1-SIZE_MATCH_RATIO) < self.avg_size() < trackpoint.size * (1+SIZE_MATCH_RATIO):
-                direction = self.direction()
-                if direction == None or diff_degrees(trackpoint.direction_to(self.kalman(trackpoint), deg=True), direction) < 30:
-                    return True
-                elif self.length_to(self.kalman(trackpoint)) < 10:
-                    return True
-                else:
+                #direction = self.direction()
+                #if direction == None or diff_degrees(trackpoint.direction_to(self.kalman(trackpoint), deg=True), direction) < 30:
+                return True
+                    # elif self.length_to(self.kalman(trackpoint)) < 10:
+                    #   return True
+                #else:
                     # Did object slow down/have a really small speed before changing direction?
-                    pass
+                #    pass
         return False
 
-
-    def draw(self, frame):
+    def draw_lines(self, frame, color=(255, 0, 255), thickness=1):
+        """
+        Draw the track to the frame.
+        """
         # Track lines.
         lines = np.array([[tp.x, tp.y] for tp in self.trackpoints])
-        thickness_factor = 1.0/(self.age)
-        cv2.polylines(frame, np.int32([lines]), 0, (255,0,255), thickness=int(3*thickness_factor))
+        cv2.polylines(frame, np.int32([lines]), 0, color, thickness=thickness)
 
+    def draw_points(self, frame, color=(0, 255, 255), thickness=1):
         # Points i each line.
         for tp in self.trackpoints:
-            cv2.circle(frame, (int(tp.x), int(tp.y)), 5, (0,255,255), 1)
+            cv2.circle(frame, (int(tp.x), int(tp.y)), 5, color, thickness=thickness)
 
-
+    def linear_length(self):
+        """
+        Gets the linear distance from the first point to the last in a track.
+        """
+        first_tp, last_tp = self.trackpoints[0], self.trackpoints[-1]
+        return first_tp.length_to(last_tp)
+        
+    def classify(self):
+        """
+        Very (too) simple classification of the track.
+        """
+        if self.size_avg() < 10000:
+            return "Bike"
+        else:
+            return "Car"

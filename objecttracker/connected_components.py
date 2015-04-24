@@ -34,3 +34,4 @@ def create_labelled_frame(fgmask):
     contours = find_contours(fgmask)
     LOG.debug("%i connected components." % (np.max(fgmask)))
     return label_frame(contours, fgmask)
+
