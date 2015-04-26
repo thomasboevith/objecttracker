@@ -11,12 +11,14 @@ def remove_noise(fgmask):
     Erode (makes the object bigger) to "swallow holes".
     then dilate (reduces the object) again.
     """
-    erode_kernel_size = min(fgmask.shape[:2])/150
+    erode_kernel_size = max(fgmask.shape[:2])/150
+    LOG.debug("Erode kernel size: '%s'."%(erode_kernel_size))
+    
     ERODE_KERNEL = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (erode_kernel_size,)*2)
     DILATE_KERNEL = np.ones((erode_kernel_size*2, )*2, np.uint8)
 
     LOG.debug("Removing noise.")
-    LOG.debug("Eroding")
+    LOG.debug("Eroding.")
     fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, ERODE_KERNEL)
 
     LOG.debug("Dilating.")
