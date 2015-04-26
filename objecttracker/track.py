@@ -161,7 +161,7 @@ class Track:
             return None
         return self.trackpoints[0].direction_to(self.trackpoints[-1], deg)
 
-    def match(self, trackpoint, frame=None):
+    def match(self, trackpoint, track_match_radius, frame=None):
         if frame != None:
             # Add a small circle in the middle of the object
             # on the main frame (computer?)
@@ -174,9 +174,9 @@ class Track:
             cv2.polylines(frame, np.int32([lines]), 0, kalman_color, thickness=1)
 
             # for radius in range(10, TRACK_MATCH_RADIUS+1, 20):
-            cv2.circle(frame, (int(trackpoint.x), int(trackpoint.y)), TRACK_MATCH_RADIUS, (0, 255, 0), thickness=1)
+            cv2.circle(frame, (int(trackpoint.x), int(trackpoint.y)), track_match_radius, (0, 255, 0), thickness=1)
 
-        if self.length_to(trackpoint) < TRACK_MATCH_RADIUS:
+        if self.length_to(trackpoint) < track_match_radius:
             if trackpoint.size * (1-SIZE_MATCH_RATIO) < self.avg_size() < trackpoint.size * (1+SIZE_MATCH_RATIO):
                 return True
         return False
@@ -227,10 +227,15 @@ class Track:
             LOG.debug(SQL)
             db.execute(SQL)
 
-    def save(self):
+    def save(self, min_linear_length):
         """
         Saves the trackpoints to a file, including the parent track.
         """
+        LOG.debug("Saving track.")
+        if self.linear_length() < min_linear_length:
+            LOG.debug("Too short track.")
+            return
+
         key_values = {
             "date": datetime.datetime.now().isoformat(),
             "avg_size": "%.3f"%self.avg_size(),

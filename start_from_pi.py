@@ -228,9 +228,16 @@ def start_counting(video_speed=1, slow_down=False, hide_video=False):
     camera = PiCamera()
     camera.resolution = (640/2, 480/2)
     camera.framerate = 32
+
     rawCapture = PiRGBArray(camera, size=camera.resolution)
     # allow the camera to warmup
-    time.sleep(0.1)
+    time.sleep(2)
+    # time.sleep(0.1)
+    camera.shutter_speed = camera.exposure_speed
+    camera.exposure_mode = 'off'
+    g = camera.awb_gains
+    camera.awb_mode = 'off'
+    camera.awb_gains = g
 
     fgbg = cv2.BackgroundSubtractorMOG()
 
