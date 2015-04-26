@@ -32,7 +32,7 @@ elif args["--verbose"]:
     logging.basicConfig(filename=args["--log-filename"], level=logging.INFO)
 else:
     logging.basicConfig(filename=args["--log-filename"], level=logging.WARNING)
-LOG.info(args)
+LOG.debug(args)
 
 def start_counting():
     fgbg = cv2.BackgroundSubtractorMOG()

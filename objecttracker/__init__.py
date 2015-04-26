@@ -86,7 +86,7 @@ def get_foreground_mask(frame, fgbg):
     kernel = (frame.shape[0]/65, )*2
     # blurred_frame = cv2.blur(frame, (7,7))
 
-    LOG.info("Kernel: %s"%str(kernel))
+    LOG.debug("Kernel: %s"%str(kernel))
     blurred_frame = cv2.blur(frame, kernel)
 
     # cv2.imshow('frame', blurred_frame)
