@@ -173,8 +173,8 @@ class Track:
             lines = np.array([[trackpoint.x, trackpoint.y], [tp_k.x, tp_k.y]])
             cv2.polylines(frame, np.int32([lines]), 0, kalman_color, thickness=1)
 
-            for radius in range(10, TRACK_MATCH_RADIUS+1, 20):
-                cv2.circle(frame, (int(trackpoint.x), int(trackpoint.y)), radius, (0, 255, 0), thickness=1)
+            # for radius in range(10, TRACK_MATCH_RADIUS+1, 20):
+            cv2.circle(frame, (int(trackpoint.x), int(trackpoint.y)), TRACK_MATCH_RADIUS, (0, 255, 0), thickness=1)
 
         if self.length_to(trackpoint) < TRACK_MATCH_RADIUS:
             if trackpoint.size * (1-SIZE_MATCH_RATIO) < self.avg_size() < trackpoint.size * (1+SIZE_MATCH_RATIO):

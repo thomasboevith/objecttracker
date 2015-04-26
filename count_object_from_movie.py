@@ -5,7 +5,7 @@ import sys
 import time
 
 __doc__ = """Usage:
-    {filename} [options] <video_filename> [--verbose|--debug] [--video-speed=<vs>]
+    {filename} [options] <video_filename> [--verbose|--debug] [--video-speed=<vs>] [--hide-video]
 
 Options:
     -h, --help                        This help message.
@@ -14,6 +14,7 @@ Options:
     --video-speed=<vs>                Speed of the video [default: 1].
     --log-filename=logfilename        Name of the log file.
     --slow-down                       Slow down when a track is active.
+    --hide-video                      Does not show the video frames.
 """.format(filename=os.path.basename(__file__))
 
 from collections import deque
@@ -142,7 +143,7 @@ def get_bgr_fgmask(fgmask):
     bgr_fgmask = labelled2bgr(labelled_fgmask)
     return bgr_fgmask
 
-def match_tracks(tracks, trackpoints, frame):
+def match_tracks(tracks, trackpoints, frame=None):
     """
     Matches trackpoints with the most suitable track.
     If not tracks to match, a new track is created.
@@ -182,29 +183,22 @@ def draw_tracks(tracks, frame):
         t.draw_lines(frame)
         t.draw_points(frame)
 
-def start_counting(video_filename, video_speed=1, slow_down=False):
-    cap = cv2.VideoCapture(video_filename)
-    fgbg = cv2.BackgroundSubtractorMOG()
-
-    # For book keeping and later to calculate a track backwards in time...
-    frames = deque([None] * 5)
-    # labelled_frames = deque([None] * 5)
-    tracks = []
-
-    while(cap.isOpened()):
-        ret, frame = cap.read()
-        
-        frames.append(frame)
-        frames.popleft() # Pops the oldest frame off the list.
-
+def get_tracks(frame, fgbg, tracks, hide_video=False):
         # Subtract the background from the foreground.
         fgmask = get_foreground_mask(frame, fgbg)
         trackpoints = get_trackpoints(fgmask)
         
-        tracks = match_tracks(tracks, trackpoints, frame)
+        # TODO: CLEAN THIS UP!!
+        if hide_video:
+            tracks = match_tracks(tracks, trackpoints)
+        else:
+            tracks = match_tracks(tracks, trackpoints, frame)
+
         for t in tracks: t.incr_age() 
         tracks = prune_tracks(tracks)
-        draw_tracks(tracks, frame)
+
+        if not hide_video:
+            draw_tracks(tracks, frame)
 
         frame_width = frame.shape[0]
         for t in [track for track in tracks if track.age > 10]:
@@ -213,32 +207,54 @@ def start_counting(video_filename, video_speed=1, slow_down=False):
                 LOG.debug("Saving track.")
                 t.save()
 
-                # Simple classification of the track.
-                track_class = t.classify()
+                if not hide_video:
+                    # Simple classification of the track.
+                    track_class = t.classify()
 
-                LOG.debug("Draw the track to the frame.")
-                t.draw_lines(frame, (255, 0, 255), thickness=3)
-                t.draw_points(frame, (0, 255, 255))
-                cv2.putText(frame, track_class, (10,100), cv2.FONT_HERSHEY_PLAIN, 2, (255, 255, 255), thickness=2)
+                    LOG.debug("Draw the track to the frame.")
+                    t.draw_lines(frame, (255, 0, 255), thickness=3)
+                    t.draw_points(frame, (0, 255, 255))
+                    cv2.putText(frame, track_class, (10,100), cv2.FONT_HERSHEY_PLAIN, 2, (255, 255, 255), thickness=2)
+
+        return frame, tracks
+
+
+def start_counting(video_filename, video_speed=1, slow_down=False, hide_video=False):
+    cap = cv2.VideoCapture(video_filename)
+    fgbg = cv2.BackgroundSubtractorMOG()
+
+    # For book keeping and later to calculate a track backwards in time...
+    # frames = deque([None] * 5)
+    # labelled_frames = deque([None] * 5)
+    tracks = []
+
+    try:
+        while(cap.isOpened()):
+            ret, frame = cap.read()
+        
+            # frames.append(frame)
+            # frames.popleft() # Pops the oldest frame off the list.
+            frame, tracks = get_tracks(frame, fgbg, tracks, hide_video)
+
+            if len(tracks) > 0:
+                LOG.debug(" ### ".join([str(t) for t in tracks]))
+                if slow_down:
+                    LOG.debug("Sleeping for 0.2s")
+                    time.sleep(0.2)
+
+            if not hide_video:
                 cv2.imshow('frame', frame)
-                cv2.waitKey(video_speed)
-                time.sleep(3)
 
-        if len(tracks) > 0:
-            LOG.debug(" ### ".join([str(t) for t in tracks]))
-            if slow_down:
-                LOG.debug("Sleeping for 0.2s")
-                time.sleep(0.2)
+                if cv2.waitKey(video_speed) & 0xFF == ord('q'):
+                    break
 
-        cv2.imshow('frame', frame)
+        print "FIN"
 
-        if cv2.waitKey(video_speed) & 0xFF == ord('q'):
-            break
-
-    print "FIN"
-
-    cap.release()
-    cv2.destroyAllWindows()
+        cap.release()
+        cv2.destroyAllWindows()
+    except Exception, e:
+        import pdb; pdb.set_trace()
+        
 
 if __name__ == "__main__":
-    start_counting(args['<video_filename>'], int(args["--video-speed"]), args["--slow-down"])
+    start_counting(args['<video_filename>'], int(args["--video-speed"]), args["--slow-down"], args['--hide-video'])
