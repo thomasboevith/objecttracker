@@ -1,9 +1,17 @@
+# coding: utf-8
+import datetime
 import numpy as np
 import cv2
 from trackpoint import Trackpoint
+import database
+
+import logging
+# Define the logger
+LOG = logging.getLogger(__name__)
 
 TRACK_MATCH_RADIUS = 100
 SIZE_MATCH_RATIO = 0.5
+TABLE_NAME = "tracks"
 
 def diff_degrees(A, B):
     diff = A - B
@@ -12,7 +20,6 @@ def diff_degrees(A, B):
     elif diff < -180:
         diff += 360
     return abs(diff)
-
 
 class Track:
     def __init__(self):
@@ -149,21 +156,10 @@ class Track:
     def length_to(self, trackpoint):
         return self.trackpoints[-1].length_to(trackpoint)
 
-    def save(self, filename, include_parents=False):
-        """
-        Saves the trackpoints to a file, including the parent track.
-        """
-        if include_parents and self.parent is not None:
-            self.parent.save(filename, include_parents=True)
-
-        with open(filename, 'a') as fp:
-            for trackpoint in self.trackpoints:
-                fp.write("{tp}\n".format(tp=trackpoint))
-
     def direction(self, deg=False):
         if self.number_of_trackpoints() < 2:
             return None
-        return self.trackpoints[-2].direction_to(self.trackpoints[-1], deg)
+        return self.trackpoints[0].direction_to(self.trackpoints[-1], deg)
 
     def match(self, trackpoint, frame=None):
         if frame != None:
@@ -182,14 +178,7 @@ class Track:
 
         if self.length_to(trackpoint) < TRACK_MATCH_RADIUS:
             if trackpoint.size * (1-SIZE_MATCH_RATIO) < self.avg_size() < trackpoint.size * (1+SIZE_MATCH_RATIO):
-                #direction = self.direction()
-                #if direction == None or diff_degrees(trackpoint.direction_to(self.kalman(trackpoint), deg=True), direction) < 30:
                 return True
-                    # elif self.length_to(self.kalman(trackpoint)) < 10:
-                    #   return True
-                #else:
-                    # Did object slow down/have a really small speed before changing direction?
-                #    pass
         return False
 
     def draw_lines(self, frame, color=(255, 0, 255), thickness=1):
@@ -220,3 +209,48 @@ class Track:
             return "Bike"
         else:
             return "Car"
+
+    @staticmethod
+    def create_tracks_table():
+        value_types = [
+            "id            integer primary key",
+            "date          text",
+            "avg_size      real",
+            "linear_length real",
+            "total_length  real",
+            "direction     real",
+            "number_of_tp  integer",
+            ]
+        SQL = '''CREATE TABLE IF NOT EXISTS %s (%s)'''%(TABLE_NAME, ", ".join(value_types))
+        SQL = " ".join(SQL.split())
+        with database.Db() as db:
+            LOG.debug(SQL)
+            db.execute(SQL)
+
+    def save(self):
+        """
+        Saves the trackpoints to a file, including the parent track.
+        """
+        key_values = {
+            "date": datetime.datetime.now().isoformat(),
+            "avg_size": "%.3f"%self.avg_size(),
+            "linear_length": "%.3f"%self.linear_length(),
+            "total_length": "%.3f"%self.total_length(),
+            "direction": "%.3f"%self.direction(deg=True),
+            "number_of_tp": "%i"%len(self.trackpoints),
+            }
+
+        keys = key_values.keys()
+        sql = '''INSERT INTO %s (%s) VALUES (%s)'''%(TABLE_NAME, ", ".join(keys), ", ".join(["?"]*len(keys)))
+        LOG.debug(sql)
+
+        values = key_values.values()
+        LOG.debug("Values: '%s'."%("', '".join(key_values.values())))
+
+        with database.Db() as db:
+            LOG.debug("Saving track.")
+            db.execute(sql, values)
+            LOG.info("Track saved.")
+
+Track.create_tracks_table()
+

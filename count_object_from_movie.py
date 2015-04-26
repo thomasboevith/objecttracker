@@ -210,13 +210,19 @@ def start_counting(video_filename, video_speed=1, slow_down=False):
         for t in [track for track in tracks if track.age > 10]:
             tracks.remove(t)
             if t.linear_length() > 0.5*frame_width:
+                LOG.debug("Saving track.")
+                t.save()
+
+                # Simple classification of the track.
                 track_class = t.classify()
+
+                LOG.debug("Draw the track to the frame.")
                 t.draw_lines(frame, (255, 0, 255), thickness=3)
                 t.draw_points(frame, (0, 255, 255))
                 cv2.putText(frame, track_class, (10,100), cv2.FONT_HERSHEY_PLAIN, 2, (255, 255, 255), thickness=2)
                 cv2.imshow('frame', frame)
                 cv2.waitKey(video_speed)
-                # time.sleep(3)
+                time.sleep(3)
 
         if len(tracks) > 0:
             LOG.debug(" ### ".join([str(t) for t in tracks]))
