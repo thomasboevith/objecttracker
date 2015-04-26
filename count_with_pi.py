@@ -34,7 +34,7 @@ else:
     logging.basicConfig(filename=args["--log-filename"], level=logging.WARNING)
 LOG.info(args)
 
-def start_counting()
+def start_counting():
     fgbg = cv2.BackgroundSubtractorMOG()
 
     camera = PiCamera()
