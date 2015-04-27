@@ -63,7 +63,8 @@ def start_counting():
     # allow the camera to warmup
     time.sleep(2)
 
-    track_match_radius = max(camera.resolution)/4
+    track_match_radius = max(camera.resolution)/6
+    min_linear_length = 0.5*max(camera.resolution)
 
     tracks = []
     for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
@@ -73,7 +74,6 @@ def start_counting():
         tracks, tracks_to_save = objecttracker.get_tracks(trackpoints, tracks, track_match_radius)
 
         frame_width = frame.shape[0]
-        min_linear_length = 0.5*frame_width
         for t in tracks_to_save: t.save(min_linear_length)
 
         rawCapture.truncate(0)

@@ -61,7 +61,6 @@ def start_counting(image_directory):
         # Draw.
         objecttracker.draw_tracks(tracks, frame)
         
-
         cv2.imshow("RESULT frame", frame)
 
         if len(tracks) + len(tracks_to_save) > 0:
