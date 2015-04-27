@@ -32,4 +32,13 @@ class Db:
 
         LOG.debug("Committing SQL.")
         self.conn.commit()
-        
+
+    def get_rows(self, sql, where_values=None):
+        if where_values == None:
+            LOG.debug("Executing SQL: '%s'."%(sql))
+            for row in self.c.execute(sql):
+                yield row
+        else: 
+            LOG.debug("Executing SQL: '%s' with values: '%s'."%(sql, where_values))
+            for row in self.c.execute(sql, where_values):
+                yield row
