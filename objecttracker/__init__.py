@@ -14,8 +14,6 @@ import logging
 # Define the logger
 LOG = logging.getLogger(__name__)
 
-MIN_OBJECT_AREA = 500
-
 def labelled2bgr(labelled_fgmask):
     """
     Assigns a colour to each a labeled connected component in the
@@ -109,7 +107,7 @@ def get_trackpoints(frame, fgbg):
     # cv2.imshow('after noise frame', fgmask)
 
     # The area must have a certain size.
-    min_object_area = min(frame.shape[0]/3, frame.shape[1]/3)
+    min_object_area = min(frame.shape[0], frame.shape[1])/4
     LOG.debug("Min object area: %i"%(min_object_area))
 
     # Collect the trackpoints.
