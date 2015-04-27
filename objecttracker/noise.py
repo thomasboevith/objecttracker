@@ -15,6 +15,7 @@ def remove_noise(fgmask):
 
     LOG.debug("Eroding (making it smaller).")
     erode_kernel_size = max(fgmask.shape[:2])/150
+    LOG.debug("Erode kernel size: '%s'."%(erode_kernel_size))
     ERODE_KERNEL = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (erode_kernel_size,)*2)
     fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, ERODE_KERNEL)
     # cv2.imshow('eroded frame', fgmask)

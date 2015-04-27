@@ -32,7 +32,7 @@ elif args["--verbose"]:
     logging.basicConfig(filename=args["--log-filename"], level=logging.INFO)
 else:
     logging.basicConfig(filename=args["--log-filename"], level=logging.WARNING)
-LOG.info(args)
+LOG.debug(args)
 
 def start_counting():
     fgbg = cv2.BackgroundSubtractorMOG()
@@ -58,7 +58,8 @@ def start_counting():
         min_linear_length = 0.5*frame_width
         for t in tracks_to_save: t.save(min_linear_length)
 
-        if cv2.waitKey(video_speed) & 0xFF == ord('q'):
+        rawCapture.truncate(0)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
     print "FIN"

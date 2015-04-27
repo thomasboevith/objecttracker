@@ -83,11 +83,11 @@ def get_foreground_mask(frame, fgbg):
     Subtracting the background from the background.
     """
     # Blur image frame by 7,7.
-    kernal = (frame.shape[0]/65, )*2
+    kernel = (frame.shape[0]/65, )*2
     # blurred_frame = cv2.blur(frame, (7,7))
 
-    LOG.info("Kernal: %s"%str(kernal))
-    blurred_frame = cv2.blur(frame, kernal)
+    LOG.debug("Kernel: %s"%str(kernel))
+    blurred_frame = cv2.blur(frame, kernel)
 
     # cv2.imshow('blurred_frame', blurred_frame)
 
