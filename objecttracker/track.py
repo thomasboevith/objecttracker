@@ -135,7 +135,9 @@ class Track:
 
         second_last_tp, last_tp = self.trackpoints[-2:]
         expected_next_point = Trackpoint((2*last_tp.x - second_last_tp.x),
-                                         (2*last_tp.y - second_last_tp.y))
+                                         (2*last_tp.y - second_last_tp.y),
+                                         None,
+                                         )
         return expected_next_point
 
         
@@ -235,9 +237,11 @@ class Track:
         if self.linear_length() < min_linear_length:
             LOG.debug("Too short track.")
             return
-
+        
+        date_str = datetime.datetime.now().isoformat()
+        
         key_values = {
-            "date": datetime.datetime.now().isoformat(),
+            "date": date_str,
             "avg_size": "%.3f"%self.avg_size(),
             "linear_length": "%.3f"%self.linear_length(),
             "total_length": "%.3f"%self.total_length(),
@@ -256,6 +260,12 @@ class Track:
             LOG.debug("Saving track.")
             db.execute(sql, values)
             LOG.info("Track saved.")
+
+        track_dir = "/tmp/tracks/%s"%(date_str)
+        os.mkdirs(track_dir)
+        for trackpoint in self.trackpoints:
+            cv2.imwrite(os.path.join(track_dir, "%0.5i.png"), trackpoint.frame)
+            
 
 Track.create_tracks_table()
 

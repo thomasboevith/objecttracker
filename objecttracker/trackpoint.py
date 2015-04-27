@@ -2,15 +2,16 @@ import numpy as np
 import sys
 
 class Trackpoint:
-    def __init__(self, x, y, size=None, color=None, shape=None):
+    def __init__(self, x, y, frame, size=None, color=None, shape=None):
         self.x = x
         self.y = y
         self.size = size
         self.color = color
         self.shape = shape
+        self.frame = frame
 
     def copy(self):
-        return Trackpoint(self.x, self.y, self.size, self.color, self.shape)
+        return Trackpoint(self.x, self.y, self.frame, self.size, self.color, self.shape)
 
     def length_to(self, tp):
         """

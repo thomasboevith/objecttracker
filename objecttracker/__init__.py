@@ -118,7 +118,7 @@ def get_trackpoints(frame, fgbg):
         # Only use contours of a certain size.
         if contour_area > min_object_area:
             cx, cy = get_centroid(cnt)
-            trackpoints.append(trackpoint.Trackpoint(cx, cy, size=contour_area))
+            trackpoints.append(trackpoint.Trackpoint(cx, cy, frame, size=contour_area))
     return trackpoints
 
 def get_tracks(trackpoints, tracks, track_match_radius):
