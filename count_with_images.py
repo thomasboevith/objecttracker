@@ -44,11 +44,14 @@ def start_counting(image_directory):
     fgbg = cv2.BackgroundSubtractorMOG()
 
     resolution = (640/2, 480/2)
-    track_match_radius = max(resolution)/4
+    track_match_radius = min(resolution)/6
 
     tracks = []
     for frame in get_images_frompath(image_directory):
         trackpoints = objecttracker.get_trackpoints(frame, fgbg)
+        for trackpoint in trackpoints:
+            cv2.circle(frame, (int(trackpoint.x), int(trackpoint.y)), track_match_radius, (0, 255, 0), thickness=1)
+
         tracks, tracks_to_save = objecttracker.get_tracks(trackpoints, tracks, track_match_radius)
 
         frame_width = frame.shape[0]
@@ -57,6 +60,7 @@ def start_counting(image_directory):
 
         # Draw.
         objecttracker.draw_tracks(tracks, frame)
+        
 
         cv2.imshow("RESULT frame", frame)
 

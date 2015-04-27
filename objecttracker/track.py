@@ -2,15 +2,14 @@
 import datetime
 import numpy as np
 import cv2
+import os
 from trackpoint import Trackpoint
 import database
-
 import logging
+
 # Define the logger
 LOG = logging.getLogger(__name__)
-
-TRACK_MATCH_RADIUS = 100
-SIZE_MATCH_RATIO = 0.5
+SIZE_MATCH_RATIO = 0.7
 TABLE_NAME = "tracks"
 
 def diff_degrees(A, B):
@@ -19,14 +18,15 @@ def diff_degrees(A, B):
         diff -= 360
     elif diff < -180:
         diff += 360
-    return abs(diff)
+    return diff
 
 class Track:
     def __init__(self):
         self.parent = None
         self.trackpoints = []
-        self.name = None
+        self.name = datetime.datetime.now().isoformat()
         self.age = 0
+        self.direction_deg = None
 
     def __str__(self):
         return "Length: '%i'. Age: '%i'. Avg size: '%f'. Avg. length between trackpoints: '%f'."%(self.total_length(), self.age, self.size_avg(), self.length_avg())
@@ -45,8 +45,18 @@ class Track:
         Adding a trackpoint to the track.
         """
         assert(isinstance(trackpoint, Trackpoint))
-        self.trackpoints.append(trackpoint)
         self.age = 1
+
+        """
+        if self.direction_deg != None:
+            A = self.trackpoints[-1].direction_to(trackpoint, deg=True)
+            B = self.direction_deg
+            self.direction_deg = diff_degrees(A, B)/2.0 + A
+        elif len(self.trackpoints) == 1:
+            self.direction_deg = self.trackpoints[-1].direction_to(trackpoint, deg=True)
+            """
+
+        self.trackpoints.append(trackpoint)
 
     def set_parent(self, parent):
         """
@@ -229,6 +239,8 @@ class Track:
             LOG.debug(SQL)
             db.execute(SQL)
 
+    
+
     def save(self, min_linear_length):
         """
         Saves the trackpoints to a file, including the parent track.
@@ -236,6 +248,7 @@ class Track:
         LOG.debug("Saving track.")
         if self.linear_length() < min_linear_length:
             LOG.debug("Too short track.")
+            self.save_trackpoints("short")
             return
         
         date_str = datetime.datetime.now().isoformat()
@@ -259,13 +272,17 @@ class Track:
         with database.Db() as db:
             LOG.debug("Saving track.")
             db.execute(sql, values)
-            LOG.info("Track saved.")
 
-        track_dir = "/tmp/tracks/%s"%(date_str)
-        os.mkdirs(track_dir)
-        for trackpoint in self.trackpoints:
-            cv2.imwrite(os.path.join(track_dir, "%0.5i.png"), trackpoint.frame)
-            
+        self.save_trackpoints("OK")
+        LOG.info("Track saved.")
+
+    def save_trackpoints(self, status):
+        track_dir = "/tmp/tracks/%s_%s"%(status, self.name)
+        os.makedirs(track_dir)
+        for i, trackpoint in enumerate(self.trackpoints):
+            self.draw_lines(trackpoint.frame, color=(0, 255, 255))
+            cv2.imwrite(os.path.join(track_dir, "%0.5i.png"%(i)), trackpoint.frame)
+
 
 Track.create_tracks_table()
 
