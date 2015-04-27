@@ -2,7 +2,7 @@
 # coding: utf-8
 import os
 __doc__ = """Usage:
-    {filename} [options] [--verbose|--debug]
+    {filename} [options] <image_directory> [--verbose|--debug]
 
 Options:
     -h, --help                        This help message.
@@ -16,8 +16,6 @@ from collections import deque
 import cv2
 import numpy as np
 import objecttracker
-from picamera.array import PiRGBArray
-from picamera import PiCamera
 
 import logging
 # Define the logger
@@ -34,23 +32,22 @@ else:
     logging.basicConfig(filename=args["--log-filename"], level=logging.WARNING)
 LOG.info(args)
 
-def start_counting():
+def get_images_frompath(path):
+    for root, dirs, files in os.walk(path):
+        files.sort()
+        for filename in files:
+            if filename.endswith(".png"):
+                LOG.debug("Filename: %s"%os.path.join(root, filename))
+                yield cv2.imread(os.path.join(root, filename))
+
+def start_counting(image_directory):
     fgbg = cv2.BackgroundSubtractorMOG()
 
-    camera = PiCamera()
-    camera.resolution = (640/2, 480/2)
-    camera.framerate = 32
-
-    rawCapture = PiRGBArray(camera, size=camera.resolution)
-    # allow the camera to warmup
-    time.sleep(2)
-
-    track_match_radius = max(camera.resolution)/4
+    resolution = (640/2, 480/2)
+    track_match_radius = max(resolution)/4
 
     tracks = []
-    for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
-        frame = frame.array
-        
+    for frame in get_images_frompath(image_directory):
         trackpoints = objecttracker.get_trackpoints(frame, fgbg)
         tracks, tracks_to_save = objecttracker.get_tracks(trackpoints, tracks, track_match_radius)
 
@@ -58,11 +55,19 @@ def start_counting():
         min_linear_length = 0.5*frame_width
         for t in tracks_to_save: t.save(min_linear_length)
 
-        if cv2.waitKey(video_speed) & 0xFF == ord('q'):
+        # Draw.
+        objecttracker.draw_tracks(tracks, frame)
+
+        cv2.imshow("RESULT frame", frame)
+
+        if len(tracks) + len(tracks_to_save) > 0:
+            time.sleep(1/5.0)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
     print "FIN"
     cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    start_counting()
+    start_counting(args['<image_directory>'])
