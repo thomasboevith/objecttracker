@@ -239,8 +239,6 @@ class Track:
             LOG.debug(SQL)
             db.execute(SQL)
 
-    
-
     def save(self, min_linear_length):
         """
         Saves the trackpoints to a file, including the parent track.
@@ -252,7 +250,6 @@ class Track:
             return
         
         date_str = datetime.datetime.now().isoformat()
-        
         key_values = {
             "date": date_str,
             "avg_size": "%.3f"%self.avg_size(),
@@ -277,7 +274,7 @@ class Track:
         LOG.info("Track saved.")
 
     def save_trackpoints(self, status):
-        track_dir = "/tmp/tracks/%s_%s"%(status, self.name)
+        track_dir = "/tmp/tracks/%s_%s_%s"%(status, self.name, datetime.datetime.now().isoformat())
         os.makedirs(track_dir)
         for i, trackpoint in enumerate(self.trackpoints):
             self.draw_lines(trackpoint.frame, color=(0, 255, 255))
