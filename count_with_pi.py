@@ -34,6 +34,24 @@ else:
     logging.basicConfig(filename=args["--log-filename"], level=logging.WARNING)
 LOG.debug(args)
 
+
+"""
+def record():
+    i = 0
+    for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
+        frame = frame.array
+        i += 1
+        filename = "capture/%05i.png"%i
+        cv2.imwrite(filename, frame)
+        if i > 10000:
+            import sys
+            sys.exit()
+        # print filename
+        rawCapture.truncate(0)
+        continue 
+"""     
+
+
 def start_counting():
     fgbg = cv2.BackgroundSubtractorMOG()
 
