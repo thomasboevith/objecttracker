@@ -7,7 +7,8 @@ import logging
 # Define the logger
 LOG = logging.getLogger(__name__)
 
-DB_FILE = os.path.join(tempfile.gettempdir(), "objectcounter.db")
+# DB_FILE = os.path.join(tempfile.gettempdir(), "objectcounter.db")
+DB_FILE = "objectcounter.db"
 
 class Db:
     def __init__(self):

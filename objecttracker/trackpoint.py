@@ -8,7 +8,7 @@ class Trackpoint:
         self.size = size
         self.color = color
         self.shape = shape
-        self.frame = frame
+        self.frame = None # frame
 
     def copy(self):
         return Trackpoint(self.x, self.y, self.frame, self.size, self.color, self.shape)

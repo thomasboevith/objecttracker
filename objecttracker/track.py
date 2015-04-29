@@ -250,7 +250,7 @@ class Track:
         LOG.debug("Saving track.")
         if self.linear_length() < min_linear_length:
             LOG.debug("Too short track.")
-            self.save_trackpoints("short")
+            # self.save_trackpoints("short")
             return
         
         date_str = datetime.datetime.now().isoformat()
@@ -274,7 +274,7 @@ class Track:
             LOG.debug("Saving track.")
             db.execute(sql, values)
 
-        self.save_trackpoints("OK")
+        # self.save_trackpoints("OK")
         LOG.info("Track saved.")
 
     def save_trackpoints(self, status):
