@@ -121,6 +121,32 @@ def get_trackpoints(frame, fgbg):
             trackpoints.append(trackpoint.Trackpoint(cx, cy, frame, size=contour_area))
     return trackpoints
 
+def connect_tracks(tracks, tracks_to_save, track_match_radius):
+    # Sort the tracks by length.
+    # tracks.sort(key=lambda t: len(t.trackpoints))
+    new_tracks_to_save = []
+    while len(tracks_to_save):
+        save_track = tracks_to_save.pop()
+        new_tracks_to_save.append(save_track)
+
+        last_tp = save_track.trackpoints[-1]
+        last_tp.sort_by_closest(tracks)
+        
+        for t in tracks:
+            first_tp = t.trackpoints[0]
+            if last_tp.length_to(first_tp) > track_match_radius*2:
+                break
+            A = t.direction(deg=True)
+            B = save_track.direction(deg=True)
+            if A != None and B != None and np.abs(track.diff_degrees(A, B)) < 10:
+                # track.set_parent(save_track)
+                new_tracks_to_save.remove(save_track)
+                save_track.connect(t)
+                tracks.append(save_track)
+                break
+    return tracks, new_tracks_to_save
+    
+
 def get_tracks(trackpoints, tracks, track_match_radius):
     tracks = match_tracks(tracks, trackpoints, track_match_radius)
     for t in tracks: t.incr_age() 
@@ -129,6 +155,7 @@ def get_tracks(trackpoints, tracks, track_match_radius):
     for t in [track for track in tracks if track.age > 10]:
         tracks_to_save.append(t)
         tracks.remove(t)
+    tracks, tracks_to_save = connect_tracks(tracks, tracks_to_save, track_match_radius)
     return tracks, tracks_to_save
 
 def get_bgr_fgmask(fgmask):

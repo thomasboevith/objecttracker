@@ -58,6 +58,10 @@ class Track:
 
         self.trackpoints.append(trackpoint)
 
+    def connect(self, track):
+        for tp in track.trackpoints:
+            self.append(tp)
+
     def set_parent(self, parent):
         """
         If a track splits up into two new tracks, the parent track
@@ -189,8 +193,8 @@ class Track:
             cv2.circle(frame, (int(trackpoint.x), int(trackpoint.y)), track_match_radius, (0, 255, 0), thickness=1)
 
         if self.length_to(trackpoint) < track_match_radius:
-            if trackpoint.size * (1-SIZE_MATCH_RATIO) < self.avg_size() < trackpoint.size * (1+SIZE_MATCH_RATIO):
-                return True
+            #if trackpoint.size * (1-SIZE_MATCH_RATIO) < self.avg_size() < trackpoint.size * (1+SIZE_MATCH_RATIO):
+            return True
         return False
 
     def draw_lines(self, frame, color=(255, 0, 255), thickness=1):
