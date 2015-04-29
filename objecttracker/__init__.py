@@ -87,12 +87,12 @@ def get_foreground_mask(frame, fgbg):
     LOG.debug("Kernel: %s"%str(kernel))
     blurred_frame = cv2.blur(frame, kernel)
 
-    cv2.imshow('blurred_frame', blurred_frame)
+    # cv2.imshow('blurred_frame', blurred_frame)
 
     # Extract background.
-    fgmask = fgbg.apply(blurred_frame)
+    fgmask = fgbg.apply(blurred_frame, learningRate=0.001)
     
-    cv2.imshow('foreground frame', fgmask)
+    # cv2.imshow('foreground frame', fgmask)
     return fgmask
 
 def get_trackpoints(frame, fgbg):
@@ -104,7 +104,7 @@ def get_trackpoints(frame, fgbg):
 
     # Remove noise from the frame.
     fgmask = noise.remove_noise(fgmask)
-    cv2.imshow('after noise frame', fgmask)
+    # cv2.imshow('after noise frame', fgmask)
 
     # The area must have a certain size.
     min_object_area = min(frame.shape[0], frame.shape[1])/4

@@ -63,8 +63,8 @@ def start_counting(image_directory):
         
         cv2.imshow("RESULT frame", frame)
 
-        if len(tracks) + len(tracks_to_save) > 0:
-            time.sleep(1/5.0)
+        #if len(tracks) + len(tracks_to_save) > 0:
+        #    time.sleep(1/10.0)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break

@@ -18,6 +18,7 @@ import numpy as np
 import objecttracker
 from picamera.array import PiRGBArray
 from picamera import PiCamera
+import gc
 
 import logging
 # Define the logger
@@ -57,7 +58,8 @@ def start_counting():
 
     camera = PiCamera()
     camera.resolution = (640/2, 480/2)
-    camera.framerate = 32
+    camera.framerate = 24
+    camera.iso = 400
 
     rawCapture = PiRGBArray(camera, size=camera.resolution)
     # allow the camera to warmup
@@ -76,6 +78,7 @@ def start_counting():
         frame_width = frame.shape[0]
         for t in tracks_to_save: t.save(min_linear_length)
 
+        gc.collect()
         rawCapture.truncate(0)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
