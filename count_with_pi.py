@@ -11,10 +11,11 @@ Options:
     --log-filename=logfilename        Name of the log file.
     -s, --save-tracks                 Save the tracks.
     -r, --record-frames               Save all the frames.
-    --record-frames-only          Only save the frames. Do count or save tracks.
+    --record-frames-only              Only save the frames. Do count or save tracks.
 """.format(filename=os.path.basename(__file__))
 
 import time
+import datetime
 from collections import deque
 import cv2
 import numpy as np
@@ -32,8 +33,7 @@ args = docopt.docopt(__doc__, version="1.0")
 
 if args['--record-frames-only']:
     args['--record-frames'] = True
-    args['--save-tracks'] = False
-    
+
 
 if args["--debug"]:
     logging.basicConfig(filename=args["--log-filename"], level=logging.DEBUG)
@@ -61,32 +61,31 @@ def record():
 """     
 
 
-def start_counting(save_tracks, save_frames):
+def start_counting(record_frames_only=False, save_tracks = False, save_frames = False):
     LOG.info("Starting.")
     fgbg = cv2.BackgroundSubtractorMOG()
 
     camera = PiCamera()
     camera.resolution = (640/2, 480/2)
     camera.framerate = 30
-    camera.iso = 800
-    camera.zoom = (0.1, 0.2, 0.9, 0.9)
+    # camera.iso = 800
+    # camera.zoom = (0.1, 0.2, 0.9, 0.9)
 
     # allow the camera to warmup
     LOG.info("Warming up.")
     time.sleep(2)
 
-    #LOG.info("Setting shutter speed.")
-    camera.shutter_speed = camera.exposure_speed
+    LOG.info("Setting shutter speed.")
+    camera.shutter_speed = 2980 # camera.exposure_speed
     camera.exposure_mode = 'off'
-    camera.shutter_speed = 40000
     LOG.info(camera.shutter_speed)
  
-    # LOG.info("Setting white ballance.")
-    # camera.awb_mode = "cloudy"
+    LOG.info("Setting white ballance.")
     # g = camera.awb_gains
-    # camera.awb_mode = 'off'
-    # camera.awb_gains = g
-    # LOG.info(g)
+    camera.awb_mode = 'off'
+    # (Fraction(379, 256), Fraction(311, 256))
+    camera.awb_gains = (1.4, 1.2)
+    LOG.info(camera.awb_gains)
 
     LOG.info("Ready.")
 
@@ -105,25 +104,23 @@ def start_counting(save_tracks, save_frames):
             directory = "/tmp/frames/"
             if not os.path.isdir(directory):
                 os.makedirs(directory)
-            filename = os.path.join(directory, "%05i.png"%(i))
+            filename = os.path.join(directory, "%s.png"%datetime.datetime.now().isoformat())
             cv2.imwrite(filename, frame)
 
-        # Extract background.
-        blurred_frame = cv2.blur(frame, (max(camera.resolution)/100,)*2)
+        if not record_frames_only:
+            # Extract background.
+            blurred_frame = cv2.blur(frame, (max(camera.resolution)/100,)*2)
+            fgmask = fgbg.apply(blurred_frame, learningRate=0.001)
+            fgmask = objecttracker.erode_and_dilate(fgmask)
+            trackpoints = objecttracker.get_trackpoints(fgmask, frame)
+            tracks, tracks_to_save = objecttracker.get_tracks(trackpoints, tracks, track_match_radius)
 
-        fgmask = fgbg.apply(blurred_frame, learningRate=0.001)
+            if save_tracks:
+                for t in tracks_to_save:
+                    t.save(min_linear_length, track_match_radius, "/tmp/tracks")
+                    t = None
+            tracks_to_save = None
 
-        fgmask = objecttracker.erode_and_dilate(fgmask)
-
-        trackpoints = objecttracker.get_trackpoints(fgmask, frame)
-        tracks, tracks_to_save = objecttracker.get_tracks(trackpoints, tracks, track_match_radius)
-
-        if save_tracks:
-            for t in tracks_to_save:
-                t.save(min_linear_length, track_match_radius, "/tmp/tracks")
-                t = None
-
-        tracks_to_save = None
         gc.collect()
         rawCapture.truncate(0)
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -133,4 +130,4 @@ def start_counting(save_tracks, save_frames):
     cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    start_counting(args['--save-tracks'], args['--record-frames'], )
+    start_counting(args['--record-frames-only'], args['--save-tracks'], args['--record-frames'])
