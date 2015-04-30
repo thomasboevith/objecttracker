@@ -4,7 +4,6 @@ import time
 from collections import deque
 import cv2
 import numpy as np
-import noise
 import connected_components
 import color
 import track
@@ -80,10 +79,6 @@ def get_trackpoints(fgmask, frame):
     """
     Gets the trackpoints from the foreground mask.
     """
-    # Remove noise from the frame.
-    fgmask = noise.remove_noise(fgmask)
-    # cv2.imshow('after noise frame', fgmask)
-
     # The area must have a certain size.
     min_object_area = min(fgmask.shape[0], fgmask.shape[1])/4
     LOG.debug("Min object area: %i"%(min_object_area))
@@ -130,7 +125,7 @@ def get_tracks(trackpoints, tracks, track_match_radius):
     for t in tracks: t.incr_age() 
     tracks = prune_tracks(tracks)
     tracks_to_save = []
-    for t in [track for track in tracks if track.age > 10]:
+    for t in [track for track in tracks if track.age > 5]:
         tracks_to_save.append(t)
         tracks.remove(t)
     tracks, tracks_to_save = connect_tracks(tracks, tracks_to_save, track_match_radius)
@@ -184,3 +179,28 @@ def draw_tracks(tracks, frame):
     for t in tracks:
         t.draw_lines(frame)
         t.draw_points(frame)
+
+
+def erode_and_dilate(fgmask):
+    """
+    To remove noise.
+
+    Erode (makes the object bigger) to "swallow holes".
+    then dilate (reduces the object) again.
+    """
+    LOG.debug("Removing noise.")
+
+    LOG.debug("Eroding (making it smaller).")
+    erode_kernel_size = max(fgmask.shape[:2])/150
+    LOG.debug("Erode kernel size: '%s'."%(erode_kernel_size))
+    ERODE_KERNEL = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (erode_kernel_size,)*2)
+    fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, ERODE_KERNEL)
+    # cv2.imshow('eroded frame', fgmask)
+
+    LOG.debug("Dilating (making it bigger again).")
+    dilate_kernel_size = erode_kernel_size*3
+    DILATE_KERNEL = np.ones((dilate_kernel_size,)*2, np.uint8)
+    fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, DILATE_KERNEL, iterations=5)
+    # cv2.imshow('dilated frame', fgmask)
+
+    return fgmask
