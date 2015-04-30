@@ -45,26 +45,36 @@ def start_counting(image_directory):
 
     resolution = (640/2, 480/2)
     track_match_radius = min(resolution)/6
+    min_linear_length = 0.5*max(resolution)
 
     tracks = []
     for frame in get_images_frompath(image_directory):
-        trackpoints = objecttracker.get_trackpoints(frame, fgbg)
+        # Extract background.
+        blurred_frame = cv2.blur(frame, (max(resolution)/100,)*2)
+        cv2.imshow("Blurred", blurred_frame)
+
+        fgmask = fgbg.apply(blurred_frame, learningRate=0.001)
+        cv2.imshow("Subtracted", fgmask)
+        
+        # Remove noise from the frame.
+        fgmask = objecttracker.erode_and_dilate(fgmask)
+        cv2.imshow('After erode and dilate', fgmask)
+
+        trackpoints = objecttracker.get_trackpoints(fgmask, frame)
+
         for trackpoint in trackpoints:
             cv2.circle(frame, (int(trackpoint.x), int(trackpoint.y)), track_match_radius, (0, 255, 0), thickness=1)
 
         tracks, tracks_to_save = objecttracker.get_tracks(trackpoints, tracks, track_match_radius)
 
-        frame_width = frame.shape[0]
-        min_linear_length = 0.5*frame_width
-        for t in tracks_to_save: t.save(min_linear_length)
-
+        
         # Draw.
         objecttracker.draw_tracks(tracks, frame)
-        
+        objecttracker.draw_tracks(tracks_to_save, frame)
         cv2.imshow("RESULT frame", frame)
 
-        #if len(tracks) + len(tracks_to_save) > 0:
-        #    time.sleep(1/10.0)
+        if len(tracks) + len(tracks_to_save) > 0:
+            time.sleep(1/10.0)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break

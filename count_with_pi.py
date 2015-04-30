@@ -109,8 +109,12 @@ def start_counting(save_tracks, save_frames):
             cv2.imwrite(filename, frame)
 
         # Extract background.
-        fgmask = fgbg.apply(frame, learningRate=0.001)
-        fgmask = cv2.blur(fgmask, (max(camera.resolution)/200,)*2)
+        blurred_frame = cv2.blur(frame, (max(camera.resolution)/100,)*2)
+
+        fgmask = fgbg.apply(blurred_frame, learningRate=0.001)
+
+        fgmask = objecttracker.erode_and_dilate(fgmask)
+
         trackpoints = objecttracker.get_trackpoints(fgmask, frame)
         tracks, tracks_to_save = objecttracker.get_tracks(trackpoints, tracks, track_match_radius)
 
