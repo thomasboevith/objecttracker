@@ -1,14 +1,15 @@
 import numpy as np
 import sys
+import cv2
 
 class Trackpoint:
     def __init__(self, x, y, frame, size=None, color=None, shape=None):
         self.x = x
         self.y = y
+        self.frame = frame
         self.size = size
         self.color = color
         self.shape = shape
-        self.frame = None # frame
 
     def copy(self):
         return Trackpoint(self.x, self.y, self.frame, self.size, self.color, self.shape)
@@ -19,6 +20,9 @@ class Trackpoint:
         """
         assert(isinstance(tp, Trackpoint))
         return np.sqrt((self.x - tp.x) ** 2 + (self.y - tp.y) ** 2)
+
+    def draw(self, frame, radius=5, color=(0, 255, 255), thickness=1):
+        cv2.circle(frame, (int(self.x), int(self.y)), radius, color, thickness=thickness)
 
     def direction_to(self, tp, deg=False):
         """
@@ -32,12 +36,13 @@ class Trackpoint:
             direction = np.rad2deg(direction)
         return direction
 
+    def sort_tracks_by_closest(self, tracks):
+        tracks.sort(key=lambda t: t.length_to(self))
+        return tracks
+
     def __str__(self):
         return "({x}, {y}) {size} {color} {shape}".format(x=self.x,
                                                               y=self.y,
                                                               size=self.size,
                                                               color=self.color,
                                                               shape=self.shape)
-    def sort_by_closest(self, tracks):
-        tracks.sort(key=lambda t: t.length_to(self))
-        return tracks

@@ -193,8 +193,8 @@ class Track:
             cv2.circle(frame, (int(trackpoint.x), int(trackpoint.y)), track_match_radius, (0, 255, 0), thickness=1)
 
         if self.length_to(trackpoint) < track_match_radius:
-            #if trackpoint.size * (1-SIZE_MATCH_RATIO) < self.avg_size() < trackpoint.size * (1+SIZE_MATCH_RATIO):
-            return True
+            if trackpoint.size * (1-SIZE_MATCH_RATIO) < self.avg_size() < trackpoint.size * (1+SIZE_MATCH_RATIO):
+                return True
         return False
 
     def draw_lines(self, frame, color=(255, 0, 255), thickness=1):
@@ -208,7 +208,7 @@ class Track:
     def draw_points(self, frame, color=(0, 255, 255), thickness=1):
         # Points i each line.
         for tp in self.trackpoints:
-            cv2.circle(frame, (int(tp.x), int(tp.y)), 5, color, thickness=thickness)
+            tp.draw(frame, color=color, thickness=thickness)
 
     def linear_length(self):
         """
@@ -243,14 +243,15 @@ class Track:
             LOG.debug(SQL)
             db.execute(SQL)
 
-    def save(self, min_linear_length):
+    def save(self, min_linear_length, track_match_radius, trackpoints_save_directory = None):
         """
         Saves the trackpoints to a file, including the parent track.
         """
         LOG.debug("Saving track.")
         if self.linear_length() < min_linear_length:
             LOG.debug("Too short track.")
-            # self.save_trackpoints("short")
+            if trackpoints_save_directory != None:
+                self.save_trackpoints_to_directory(trackpoints_save_directory, "short", track_match_radius)
             return
         
         date_str = datetime.datetime.now().isoformat()
@@ -274,16 +275,20 @@ class Track:
             LOG.debug("Saving track.")
             db.execute(sql, values)
 
-        # self.save_trackpoints("OK")
+        if trackpoints_save_directory != None:
+            self.save_trackpoints_to_directory(trackpoints_save_directory, "OK", track_match_radius)
         LOG.info("Track saved.")
 
-    def save_trackpoints(self, status):
-        track_dir = "/tmp/tracks/%s_%s_%s"%(status, self.name, datetime.datetime.now().isoformat())
-        os.makedirs(track_dir)
-        for i, trackpoint in enumerate(self.trackpoints):
-            self.draw_lines(trackpoint.frame, color=(0, 255, 255))
-            cv2.imwrite(os.path.join(track_dir, "%0.5i.png"%(i)), trackpoint.frame)
 
+    def save_trackpoints_to_directory(self, trackpoints_save_directory, status_name, tp_search_radius):
+        track_dir = os.path.join(trackpoints_save_directory, "%s_%s_%s"%(status_name, self.name, datetime.datetime.now().isoformat()))
+        os.makedirs(track_dir)
+        for i, tp in enumerate(self.trackpoints):
+            self.draw_lines(tp.frame, color=(0, 255, 255))
+            self.draw_points(tp.frame, color=(0, 255, 255))
+            tp.draw(tp.frame, color=(255, 0, 255), thickness=3)
+            tp.draw(tp.frame, radius=tp_search_radius, color=(0, 255, 0), thickness=1)
+            cv2.imwrite(os.path.join(track_dir, "%0.5i.png"%(i)), tp.frame)
 
 Track.create_tracks_table()
 

@@ -76,38 +76,16 @@ def get_bounding_box(contour):
     return cv2.boundingRect(contour)
 
 
-def get_foreground_mask(frame, fgbg):
-    """
-    Subtracting the background from the background.
-    """
-    # Blur image frame by 7,7.
-    kernel = (frame.shape[0]/200, )*2
-    # blurred_frame = cv2.blur(frame, (7,7))
-
-    LOG.debug("Kernel: %s"%str(kernel))
-    blurred_frame = cv2.blur(frame, kernel)
-
-    # cv2.imshow('blurred_frame', blurred_frame)
-
-    # Extract background.
-    fgmask = fgbg.apply(blurred_frame, learningRate=0.001)
-    
-    # cv2.imshow('foreground frame', fgmask)
-    return fgmask
-
-def get_trackpoints(frame, fgbg):
+def get_trackpoints(fgmask, frame):
     """
     Gets the trackpoints from the foreground mask.
     """
-    # Subtract the background from the foreground.
-    fgmask = get_foreground_mask(frame, fgbg)
-
     # Remove noise from the frame.
     fgmask = noise.remove_noise(fgmask)
     # cv2.imshow('after noise frame', fgmask)
 
     # The area must have a certain size.
-    min_object_area = min(frame.shape[0], frame.shape[1])/4
+    min_object_area = min(fgmask.shape[0], fgmask.shape[1])/4
     LOG.debug("Min object area: %i"%(min_object_area))
 
     # Collect the trackpoints.
@@ -130,7 +108,7 @@ def connect_tracks(tracks, tracks_to_save, track_match_radius):
         new_tracks_to_save.append(save_track)
 
         last_tp = save_track.trackpoints[-1]
-        last_tp.sort_by_closest(tracks)
+        last_tp.sort_tracks_by_closest(tracks)
         
         for t in tracks:
             first_tp = t.trackpoints[0]
@@ -176,7 +154,7 @@ def match_tracks(tracks, trackpoints, track_match_radius, frame=None):
         tp = trackpoints.pop()
         
         matched = False
-        closest_tracks = tp.sort_by_closest(tracks)
+        closest_tracks = tp.sort_tracks_by_closest(tracks)
         # Find all the matching tracks.
         for t in closest_tracks:
             if t.match(tp, track_match_radius, frame):
