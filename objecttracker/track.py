@@ -289,6 +289,7 @@ class Track:
             tp.draw(tp.frame, color=(255, 0, 255), thickness=3)
             tp.draw(tp.frame, radius=tp_search_radius, color=(0, 255, 0), thickness=1)
             cv2.imwrite(os.path.join(track_dir, "%0.5i.png"%(i)), tp.frame)
+        LOG.info("Trackpoints '%s' saved to %s."%(status_name, track_dir))
 
 Track.create_tracks_table()
 
