@@ -3,11 +3,12 @@ import cv2
 
 
 class Trackpoint:
-    def __init__(self, x, y, frame, size=None, color=None):
+    def __init__(self, timestamp, x, y, frame, size=None, color=None):
         """
         A trackpoint is the centroid of the object.
         Each trackpoint is assigned to a tracks.
         """
+        self.timestamp = timestamp
         self.x = x
         self.y = y
         self.frame = frame
@@ -27,7 +28,7 @@ class Trackpoint:
         """
         Creates a new trackpoint with the same values.
         """
-        return Trackpoint(self.x, self.y, self.frame, self.size, self.color)
+        return Trackpoint(self.timestamp, self.x, self.y, self.frame, self.size, self.color)
 
     def length_to(self, tp):
         """

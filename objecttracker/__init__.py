@@ -89,17 +89,18 @@ def get_trackpoints(fgmask, frame):
         # Only use contours of a certain size.
         if contour_area > min_object_area:
             cx, cy = get_centroid(cnt)
-            trackpoints.append(trackpoint.Trackpoint(cx, cy, frame, size=contour_area))
+            trackpoints.append(trackpoint.Trackpoint(frame[0], cx, cy, frame, size=contour_area))
     return trackpoints
 
 def get_tracks_to_save(fgbg, frame, tracks, track_match_radius):
+    stamp, img = frame
     # Extract background.
     resolution = frame.shape[0:2]
     # Blur the frame a little.
-    blurred_frame = cv2.blur(frame, (int(max(resolution)/100.0), )*2)
+    blurred_img = cv2.blur(img, (int(max(resolution)/100.0), )*2)
 
     # Subtract the foreground from the background.
-    fgmask = fgbg.apply(blurred_frame, learningRate=0.001)
+    fgmask = fgbg.apply(blurred_img, learningRate=0.001)
 
     # Remove the smallest noise and holes in objects.
     fgmask = erode_and_dilate(fgmask)

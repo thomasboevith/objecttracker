@@ -189,10 +189,12 @@ class Track:
             return None
 
         second_last_tp, last_tp = self.trackpoints[-2:]
-        expected_next_point = Trackpoint((2*last_tp.x - second_last_tp.x),
-                                         (2*last_tp.y - second_last_tp.y),
-                                         None,
-                                         )
+        expected_next_point = Trackpoint(
+            last_tp.timestamp + (last_tp.timestamp - second_last_tp.timestamp),
+            (2*last_tp.x - second_last_tp.x),
+            (2*last_tp.y - second_last_tp.y),
+            None,
+            )
         return expected_next_point
 
     def kalman(self, trackpoint):
