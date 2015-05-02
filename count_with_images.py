@@ -19,7 +19,11 @@ import logging
 # Define the logger
 LOG = logging.getLogger(__name__)
 
-def get_images_frompath(frames, path):
+def get_frames(frames, path):
+    """
+    Inserts frames into the frames queue, which must be a 
+    multiprocessing.Queue.
+    """
     for root, dirs, files in os.walk(path):
         LOG.debug("Dir, '%s': %i."%(root, len(files)))
         files.sort()
@@ -42,7 +46,7 @@ if __name__ == "__main__":
 
     frames = multiprocessing.Queue()
 
-    frame_reader = multiprocessing.Process(target=get_images_frompath, args=(frames, args['<image_directory>']))
+    frame_reader = multiprocessing.Process(target=get_frames, args=(frames, args['<image_directory>']))
     frame_reader.daemon = True
     frame_reader.start()
     
@@ -50,6 +54,7 @@ if __name__ == "__main__":
     counter_process.daemon = True
     counter_process.start()
 
+    # This will wait forever as there will allways be more frames.
     frame_reader.join()
 
     print "FIN"

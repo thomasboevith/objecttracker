@@ -161,7 +161,7 @@ def get_bgr_fgmask(fgmask):
     bgr_fgmask = labelled2bgr(labelled_fgmask)
     return bgr_fgmask
 
-def match_tracks(tracks, trackpoints, track_match_radius, frame=None):
+def match_tracks(tracks, trackpoints, track_match_radius):
     """
     Matches trackpoints with the most suitable track.
     If not tracks to match, a new track is created.
@@ -173,7 +173,7 @@ def match_tracks(tracks, trackpoints, track_match_radius, frame=None):
         closest_tracks = tp.sort_tracks_by_closest(tracks)
         # Find all the matching tracks.
         for t in closest_tracks:
-            if t.match(tp, track_match_radius, frame):
+            if t.match(tp, track_match_radius):
                 t.append(t.kalman(tp))
                 matched = True
                 break
@@ -237,7 +237,7 @@ def counter(frames):
         frame = frames.get(block=True)
         LOG.debug("Got a frame.")
 
-        tracks, tracks_to_save = objecttracker.get_tracks_to_save(fgbg, frame, tracks)
+        tracks, tracks_to_save = get_tracks_to_save(fgbg, frame, tracks)
 
         for t in tracks_to_save:
             t.save(min_linear_length=max(frame.shape)*.5, track_match_radius=30, trackpoints_save_directory="/tmp/tracks")

@@ -60,7 +60,7 @@ class Track:
 
     @property
     def direction_deg(self):
-        self.direction_to(deg=True)
+        return self.direction(deg=True)
 
     def direction(self, deg=False):
         if self.number_of_trackpoints() < 2:
@@ -68,9 +68,7 @@ class Track:
         return self.trackpoints[0].direction_to(self.trackpoints[-1], deg)
 
     def __str__(self):
-        return """Length: '%i'. Age: '%i'. Avg size: '%f'.
-Avg. length between trackpoints: '%f'.""" %
-    (self.total_length(), self.age, self.size_avg(), self.length_avg())
+        return "Length: '%i'. Age: '%i'. Avg size: '%f'. Avg. length between trackpoints: '%f'." % (self.total_length(), self.age, self.size_avg(), self.length_avg())
 
     def size_avg(self):
         return np.average([tp.size for tp in self.trackpoints])
