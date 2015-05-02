@@ -11,15 +11,11 @@ Options:
     --log-filename=logfilename        Name of the log file.
 """.format(filename=os.path.basename(__file__))
 
-import time
-import datetime
-from collections import deque
 import cv2
-import numpy as np
 import multiprocessing
 import objecttracker
-
 import logging
+
 # Define the logger
 LOG = logging.getLogger(__name__)
 
@@ -31,21 +27,6 @@ def get_images_frompath(frames, path):
             if filename.endswith(".png"):
                 frames.put(cv2.imread(os.path.join(root, filename)))
 
-def counter(frames):
-    fgbg = cv2.BackgroundSubtractorMOG()
-
-    tracks = []
-    while True:
-        LOG.debug("Framesize: %i"%frames.qsize())
-
-        frame = frames.get(block=True)
-        LOG.debug("Got a frame.")
-
-        tracks, tracks_to_save = objecttracker.get_tracks_to_save(fgbg, frame, tracks)
-
-        for t in tracks_to_save:
-            t.save(min_linear_length=max(frame.shape)*.5, track_match_radius=30, trackpoints_save_directory="/tmp/tracks")
-        
 
 if __name__ == "__main__":
     import docopt
@@ -65,7 +46,7 @@ if __name__ == "__main__":
     frame_reader.daemon = True
     frame_reader.start()
     
-    counter_process = multiprocessing.Process(target=counter, args=(frames, ))
+    counter_process = multiprocessing.Process(target=objecttracker.counter, args=(frames, ))
     counter_process.daemon = True
     counter_process.start()
 

@@ -1,32 +1,51 @@
 import numpy as np
-import sys
 import cv2
 
+
 class Trackpoint:
-    def __init__(self, x, y, frame, size=None, color=None, shape=None):
+    def __init__(self, x, y, frame, size=None, color=None):
+        """
+        A trackpoint is the centroid of the object.
+        Each trackpoint is assigned to a tracks.
+        """
         self.x = x
         self.y = y
         self.frame = frame
         self.size = size
         self.color = color
-        self.shape = shape
+
+    def __str__(self):
+        """
+        String representation of the trackpoint.
+        """
+        return "({x}, {y}) {size} {color}".format(x=self.x,
+                                                  y=self.y,
+                                                  size=self.size,
+                                                  color=self.color)
 
     def copy(self):
-        return Trackpoint(self.x, self.y, self.frame, self.size, self.color, self.shape)
+        """
+        Creates a new trackpoint with the same values.
+        """
+        return Trackpoint(self.x, self.y, self.frame, self.size, self.color)
 
     def length_to(self, tp):
         """
-        Calculate the lengt between two track points.
+        Calculate the lengt between two track points. Linear length.
         """
         assert(isinstance(tp, Trackpoint))
         return np.sqrt((self.x - tp.x) ** 2 + (self.y - tp.y) ** 2)
 
     def draw(self, frame, radius=5, color=(0, 255, 255), thickness=1):
-        cv2.circle(frame, (int(self.x), int(self.y)), radius, color, thickness=thickness)
+        """
+        Draw the trackpoint on the frame.
+        """
+        cv2.circle(frame, (int(self.x), int(self.y)), radius, color,
+                   thickness=thickness)
 
     def direction_to(self, tp, deg=False):
         """
-        Calculate the direction to the input point.
+        Calculate the direction to the input trackpoint
         If deg is set to True, the output is in degrees.
         """
         assert(isinstance(tp, Trackpoint))
@@ -37,12 +56,9 @@ class Trackpoint:
         return direction
 
     def sort_tracks_by_closest(self, tracks):
+        """
+        Sorts the tracks (input) by the closest.
+        The closest track is in the first in the tracks list.
+        """
         tracks.sort(key=lambda t: t.length_to(self))
         return tracks
-
-    def __str__(self):
-        return "({x}, {y}) {size} {color} {shape}".format(x=self.x,
-                                                              y=self.y,
-                                                              size=self.size,
-                                                              color=self.color,
-                                                              shape=self.shape)

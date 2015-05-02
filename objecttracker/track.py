@@ -9,10 +9,40 @@ import logging
 
 # Define the logger
 LOG = logging.getLogger(__name__)
-SIZE_MATCH_RATIO = 0.7
 TABLE_NAME = "tracks"
 
+
+# How the tracs table should look.
+def create_tracks_table():
+    value_types = [
+        "id            integer primary key",
+        "date          text",
+        "avg_size      real",
+        "linear_length real",
+        "total_length  real",
+        "direction     real",
+        "number_of_tp  integer",
+        ]
+    SQL = '''CREATE TABLE IF NOT EXISTS %s (%s)''' % \
+        (TABLE_NAME, ", ".join(value_types))
+    SQL = " ".join(SQL.split())
+    with database.Db() as db:
+        LOG.debug(SQL)
+        db.execute(SQL)
+
+# Create the table.
+create_tracks_table()
+
+
 def diff_degrees(A, B):
+    """
+    The difference between two angles in degrees.
+
+    Example:
+    A = 60 deg
+    B = 70 deg
+    Diff = -10 deg
+    """
     diff = A - B
     if diff > 180:
         diff -= 360
@@ -20,45 +50,56 @@ def diff_degrees(A, B):
         diff += 360
     return diff
 
+
 class Track:
     def __init__(self):
         self.parent = None
         self.trackpoints = []
         self.name = datetime.datetime.now().isoformat()
         self.age = 0
-        self.direction_deg = None
+
+    @property
+    def direction_deg(self):
+        self.direction_to(deg=True)
+
+    def direction(self, deg=False):
+        if self.number_of_trackpoints() < 2:
+            return None
+        return self.trackpoints[0].direction_to(self.trackpoints[-1], deg)
 
     def __str__(self):
-        return "Length: '%i'. Age: '%i'. Avg size: '%f'. Avg. length between trackpoints: '%f'."%(self.total_length(), self.age, self.size_avg(), self.length_avg())
+        return """Length: '%i'. Age: '%i'. Avg size: '%f'.
+Avg. length between trackpoints: '%f'.""" %
+    (self.total_length(), self.age, self.size_avg(), self.length_avg())
 
     def size_avg(self):
         return np.average([tp.size for tp in self.trackpoints])
 
     def incr_age(self):
+        """
+        Iterates the track one "age". Reset the age counter every
+        time a new trackpoint is added.
+        """
         self.age += 1
-        
+
     def append(self, trackpoint):
         self.add_trackpoint(trackpoint)
 
     def add_trackpoint(self, trackpoint):
         """
         Adding a trackpoint to the track.
+        The age counter gets a reset.
         """
         assert(isinstance(trackpoint, Trackpoint))
         self.age = 1
-
-        """
-        if self.direction_deg != None:
-            A = self.trackpoints[-1].direction_to(trackpoint, deg=True)
-            B = self.direction_deg
-            self.direction_deg = diff_degrees(A, B)/2.0 + A
-        elif len(self.trackpoints) == 1:
-            self.direction_deg = self.trackpoints[-1].direction_to(trackpoint, deg=True)
-            """
-
         self.trackpoints.append(trackpoint)
 
     def connect(self, track):
+        """
+        Connects two trackpoints.
+
+        TODO: Use the parent functionality.
+        """
         for tp in track.trackpoints:
             self.append(tp)
 
@@ -113,21 +154,24 @@ class Track:
         ))
 
     def length_avg(self, include_parents=False):
+        """
+        Calculates the average length of the trackpoints in the track.
+        """
         number_of_trackpoints = self.number_of_trackpoints(include_parents)
         if number_of_trackpoints < 2:
             return 0
-        return self.total_length(include_parents) / number_of_trackpoints - 1 
+        return self.total_length(include_parents) / number_of_trackpoints - 1
 
     def sum_size(self, include_parents=False):
         size = 0
-        if self.parent != None and include_parents:
+        if self.parent is not None and include_parents:
             size += self.parent.sum_size(include_parents)
         size += sum([tp.size for tp in self.trackpoints])
         return size
-        
 
     def avg_size(self, include_parents=False):
-        return self.sum_size(include_parents) / self.number_of_trackpoints(include_parents)
+        return self.sum_size(include_parents) / \
+            self.number_of_trackpoints(include_parents)
 
     def number_of_trackpoints(self, include_parents=False):
         """
@@ -139,7 +183,6 @@ class Track:
                 include_parents=True
                 )
         return number_of_trackpoints + len(self.trackpoints)
-
 
     def expected_next_point(self):
         # TODO: Handle inherited trackpoints.
@@ -154,12 +197,11 @@ class Track:
                                          )
         return expected_next_point
 
-        
     def kalman(self, trackpoint):
         assert(isinstance(trackpoint, Trackpoint))
 
         expected_tp = self.expected_next_point()
-        if expected_tp != None:
+        if expected_tp is not None:
             x = int((expected_tp.x + trackpoint.x)/2.0)
             y = int((expected_tp.y + trackpoint.y)/2.0)
 
@@ -172,28 +214,11 @@ class Track:
     def length_to(self, trackpoint):
         return self.trackpoints[-1].length_to(trackpoint)
 
-    def direction(self, deg=False):
-        if self.number_of_trackpoints() < 2:
-            return None
-        return self.trackpoints[0].direction_to(self.trackpoints[-1], deg)
-
-    def match(self, trackpoint, track_match_radius, frame=None):
-        if frame != None:
-            # Add a small circle in the middle of the object
-            # on the main frame (computer?)
-            cv2.circle(frame, (int(trackpoint.x), int(trackpoint.y)), 0, (0, 255, 0), thickness=2)
-            tp_k = self.kalman(trackpoint)
-            kalman_color = (255, 255, 255)
-            cv2.circle(frame, (int(tp_k.x), int(tp_k.y)), 1, kalman_color, thickness=1)
-            cv2.circle(frame, (int(tp_k.x), int(tp_k.y)), 15, kalman_color, thickness=2)
-            lines = np.array([[trackpoint.x, trackpoint.y], [tp_k.x, tp_k.y]])
-            cv2.polylines(frame, np.int32([lines]), 0, kalman_color, thickness=1)
-
-            # for radius in range(10, TRACK_MATCH_RADIUS+1, 20):
-            cv2.circle(frame, (int(trackpoint.x), int(trackpoint.y)), track_match_radius, (0, 255, 0), thickness=1)
-
+    def match(self, trackpoint, track_match_radius, size_match_ratio=0.7):
         if self.length_to(trackpoint) < track_match_radius:
-            if trackpoint.size * (1-SIZE_MATCH_RATIO) < self.avg_size() < trackpoint.size * (1+SIZE_MATCH_RATIO):
+            min_size = trackpoint.size * (1-size_match_ratio)
+            max_size = trackpoint.size * (1+size_match_ratio)
+            if min_size < self.avg_size() < max_size:
                 return True
         return False
 
@@ -216,7 +241,7 @@ class Track:
         """
         first_tp, last_tp = self.trackpoints[0], self.trackpoints[-1]
         return first_tp.length_to(last_tp)
-        
+
     def classify(self):
         """
         Very (too) simple classification of the track.
@@ -226,70 +251,67 @@ class Track:
         else:
             return "Car"
 
-    @staticmethod
-    def create_tracks_table():
-        value_types = [
-            "id            integer primary key",
-            "date          text",
-            "avg_size      real",
-            "linear_length real",
-            "total_length  real",
-            "direction     real",
-            "number_of_tp  integer",
-            ]
-        SQL = '''CREATE TABLE IF NOT EXISTS %s (%s)'''%(TABLE_NAME, ", ".join(value_types))
-        SQL = " ".join(SQL.split())
-        with database.Db() as db:
-            LOG.debug(SQL)
-            db.execute(SQL)
-
-    def save(self, min_linear_length, track_match_radius, trackpoints_save_directory = None):
+    def save(self, min_linear_length, track_match_radius,
+             trackpoints_save_directory=None):
         """
         Saves the trackpoints to a file, including the parent track.
         """
         LOG.debug("Saving track.")
         if self.linear_length() < min_linear_length:
             LOG.debug("Too short track.")
-            if trackpoints_save_directory != None:
-                self.save_trackpoints_to_directory(trackpoints_save_directory, "short", track_match_radius)
+            if trackpoints_save_directory is not None:
+                self.save_trackpoints_to_directory(trackpoints_save_directory,
+                                                   "short", track_match_radius)
             return
-        
+
         date_str = datetime.datetime.now().isoformat()
         key_values = {
             "date": date_str,
-            "avg_size": "%.3f"%self.avg_size(),
-            "linear_length": "%.3f"%self.linear_length(),
-            "total_length": "%.3f"%self.total_length(),
-            "direction": "%.3f"%self.direction(deg=True),
-            "number_of_tp": "%i"%len(self.trackpoints),
+            "avg_size": "%.3f" % self.avg_size(),
+            "linear_length": "%.3f" % self.linear_length(),
+            "total_length": "%.3f" % self.total_length(),
+            "direction": "%.3f" % self.direction_deg,
+            "number_of_tp": "%i" % len(self.trackpoints),
             }
 
         keys = key_values.keys()
-        sql = '''INSERT INTO %s (%s) VALUES (%s)'''%(TABLE_NAME, ", ".join(keys), ", ".join(["?"]*len(keys)))
+        sql = '''INSERT INTO %s (%s) VALUES (%s)''' % (
+            TABLE_NAME,
+            ", ".join(keys),
+            ", ".join(["?"]*len(keys)))
+
         LOG.debug(sql)
 
         values = key_values.values()
-        LOG.debug("Values: '%s'."%("', '".join(key_values.values())))
+        LOG.debug("Values: '%s'." % ("', '".join(key_values.values())))
 
         with database.Db() as db:
             LOG.debug("Saving track.")
             db.execute(sql, values)
 
-        if trackpoints_save_directory != None:
-            self.save_trackpoints_to_directory(trackpoints_save_directory, "OK", track_match_radius)
+        if trackpoints_save_directory is not None:
+            self.save_trackpoints_to_directory(
+                trackpoints_save_directory, "OK", track_match_radius)
         LOG.info("Track saved.")
 
-
-    def save_trackpoints_to_directory(self, trackpoints_save_directory, status_name, tp_search_radius):
-        track_dir = os.path.join(trackpoints_save_directory, "%s_%s_%s"%(status_name, self.name, datetime.datetime.now().isoformat()))
+    def save_trackpoints_to_directory(self,
+                                      trackpoints_save_directory,
+                                      status_name,
+                                      tp_search_radius):
+        track_dir = os.path.join(
+            trackpoints_save_directory, "%s_%s_%s" % (
+                status_name,
+                self.name,
+                datetime.datetime.now().isoformat()))
         os.makedirs(track_dir)
         for i, tp in enumerate(self.trackpoints):
             self.draw_lines(tp.frame, color=(0, 255, 255))
             self.draw_points(tp.frame, color=(0, 255, 255))
             tp.draw(tp.frame, color=(255, 0, 255), thickness=3)
-            tp.draw(tp.frame, radius=tp_search_radius, color=(0, 255, 0), thickness=1)
-            cv2.imwrite(os.path.join(track_dir, "%0.5i.png"%(i)), tp.frame)
-        LOG.info("Trackpoints '%s' saved to %s."%(status_name, track_dir))
-
-Track.create_tracks_table()
-
+            tp.draw(
+                tp.frame,
+                radius=tp_search_radius,
+                color=(0, 255, 0),
+                thickness=1)
+            cv2.imwrite(os.path.join(track_dir, "%0.5i.png" % (i)), tp.frame)
+        LOG.info("Trackpoints '%s' saved to %s." % (status_name, track_dir))

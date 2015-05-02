@@ -1,7 +1,5 @@
 # coding: utf-8
 import sys
-import time
-from collections import deque
 import cv2
 import numpy as np
 import connected_components
@@ -227,3 +225,20 @@ def erode_and_dilate(fgmask):
     # cv2.imshow('dilated frame', fgmask)
 
     return fgmask
+
+
+def counter(frames):
+    fgbg = cv2.BackgroundSubtractorMOG()
+
+    tracks = []
+    while True:
+        LOG.debug("Framesize: %i"%frames.qsize())
+
+        frame = frames.get(block=True)
+        LOG.debug("Got a frame.")
+
+        tracks, tracks_to_save = objecttracker.get_tracks_to_save(fgbg, frame, tracks)
+
+        for t in tracks_to_save:
+            t.save(min_linear_length=max(frame.shape)*.5, track_match_radius=30, trackpoints_save_directory="/tmp/tracks")
+        
