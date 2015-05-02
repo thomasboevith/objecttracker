@@ -92,34 +92,9 @@ def get_trackpoints(fgmask, frame):
             trackpoints.append(trackpoint.Trackpoint(cx, cy, frame, size=contour_area))
     return trackpoints
 
-def connect_tracks(tracks, tracks_to_save, track_match_radius):
-    LOG.debug("Connecting tracks")
-    new_tracks_to_save = []
-    while len(tracks_to_save):
-        track_to_save = tracks_to_save.pop()
-        new_tracks_to_save.append(track_to_save)
-
-        last_tp = track_to_save.trackpoints[-1]
-        last_tp.sort_tracks_by_closest(tracks)
-        
-        for t in tracks:
-            first_tp = t.trackpoints[0]
-            if last_tp.length_to(first_tp) > track_match_radius*2:
-                break
-            A = t.direction(deg=True)
-            B = track_to_save.direction(deg=True)
-            if A != None and B != None and np.abs(track.diff_degrees(A, B)) < 10:
-                new_tracks_to_save.remove(track_to_save)
-                track_to_save.connect(t)
-                tracks.append(track_to_save)
-                break
-    return tracks, new_tracks_to_save
-    
-
-def get_tracks_to_save(fgbg, frame, tracks):
+def get_tracks_to_save(fgbg, frame, tracks, track_match_radius):
     # Extract background.
     resolution = frame.shape[0:2]
-    track_match_radius = max(resolution)/6.0
     # Blur the frame a little.
     blurred_frame = cv2.blur(frame, (int(max(resolution)/100.0), )*2)
 
@@ -152,6 +127,29 @@ def separate_tracks(trackpoints, tracks, track_match_radius):
     tracks, tracks_to_save = connect_tracks(new_tracks, tracks_to_save, track_match_radius)
     return tracks, tracks_to_save
 
+def connect_tracks(tracks, tracks_to_save, track_match_radius):
+    LOG.debug("Connecting tracks")
+    new_tracks_to_save = []
+    while len(tracks_to_save):
+        track_to_save = tracks_to_save.pop()
+        new_tracks_to_save.append(track_to_save)
+
+        last_tp = track_to_save.trackpoints[-1]
+        last_tp.sort_tracks_by_closest(tracks)
+        
+        for t in tracks:
+            first_tp = t.trackpoints[0]
+            if last_tp.length_to(first_tp) > track_match_radius*2:
+                break
+            A = t.direction(deg=True)
+            B = track_to_save.direction(deg=True)
+            if A != None and B != None and np.abs(track.diff_degrees(A, B)) < 10:
+                new_tracks_to_save.remove(track_to_save)
+                track_to_save.connect(t)
+                tracks.append(track_to_save)
+                break
+    return tracks, new_tracks_to_save
+    
 def get_bgr_fgmask(fgmask):
     """
     Gets a coloured mask with bgr colours.
@@ -226,19 +224,24 @@ def erode_and_dilate(fgmask):
 
     return fgmask
 
-
-def counter(frames):
+def counter(frames_queue, tracks_to_save_queue, track_match_radius):
     fgbg = cv2.BackgroundSubtractorMOG()
 
     tracks = []
     while True:
-        LOG.debug("Framesize: %i"%frames.qsize())
-
-        frame = frames.get(block=True)
+        LOG.debug("Number of frames in queue: %i."%frames_queue.qsize())
+        LOG.debug("Waiting for a frame.")
+        frame = frames_queue.get(block=True)
         LOG.debug("Got a frame.")
 
-        tracks, tracks_to_save = get_tracks_to_save(fgbg, frame, tracks)
+        tracks, tracks_to_save = get_tracks_to_save(fgbg, frame, tracks, track_match_radius)
 
         for t in tracks_to_save:
-            t.save(min_linear_length=max(frame.shape)*.5, track_match_radius=30, trackpoints_save_directory="/tmp/tracks")
+            # Putting tracks to save in the save queue.
+            tracks_to_save_queue.put(t)
+
+def save(tracks_to_save_queue, min_linear_length, track_match_radius, trackpoints_save_directory):
+    while True:
+        t = tracks_to_save_queue.get(block=True)
+        t.save(min_linear_length, track_match_radius, trackpoints_save_directory)
         
