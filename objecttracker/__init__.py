@@ -95,6 +95,7 @@ def get_trackpoints(fgmask, frame):
     return trackpoints
 
 def connect_tracks(tracks, tracks_to_save, track_match_radius):
+    LOG.debug("Connecting tracks")
     new_tracks_to_save = []
     while len(tracks_to_save):
         track_to_save = tracks_to_save.pop()
@@ -117,15 +118,40 @@ def connect_tracks(tracks, tracks_to_save, track_match_radius):
     return tracks, new_tracks_to_save
     
 
-def get_tracks(trackpoints, tracks, track_match_radius):
+def get_tracks_to_save(fgbg, frame, tracks):
+    # Extract background.
+    resolution = frame.shape[0:2]
+    track_match_radius = max(resolution)/6.0
+    # Blur the frame a little.
+    blurred_frame = cv2.blur(frame, (int(max(resolution)/100.0), )*2)
+
+    # Subtract the foreground from the background.
+    fgmask = fgbg.apply(blurred_frame, learningRate=0.001)
+
+    # Remove the smallest noise and holes in objects.
+    fgmask = erode_and_dilate(fgmask)
+
+    # Get all trackpoints.
+    trackpoints = get_trackpoints(fgmask, frame)
+
+    # Match the tracks with the trackpoints.
+    tracks, tracks_to_save = separate_tracks(trackpoints, tracks, track_match_radius)
+    return tracks, tracks_to_save
+
+def separate_tracks(trackpoints, tracks, track_match_radius):
+    LOG.debug("Separating tracks.")
+
     tracks = match_tracks(tracks, trackpoints, track_match_radius)
     for t in tracks: t.incr_age() 
     tracks = prune_tracks(tracks)
     tracks_to_save = []
-    for t in [track for track in tracks if track.age > 5]:
-        tracks_to_save.append(t)
-        tracks.remove(t)
-    tracks, tracks_to_save = connect_tracks(tracks, tracks_to_save, track_match_radius)
+    new_tracks = []
+    for track in tracks:
+        if track.age > 5:
+            tracks_to_save.append(t)
+        else:
+            new_tracks.append(t)
+    tracks, tracks_to_save = connect_tracks(new_tracks, tracks_to_save, track_match_radius)
     return tracks, tracks_to_save
 
 def get_bgr_fgmask(fgmask):
