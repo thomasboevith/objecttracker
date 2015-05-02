@@ -12,19 +12,16 @@ Options:
     -s, --save-tracks           Save the tracks.
     -r, --record-frames         Save all the frames.
     --record-frames-only        Only save the frames.
-    --tracks-save-path          Where to save the tracks,
+    --tracks-save-path=path     Where to save the tracks,
                                 [default: /data/tracks].
 """.format(filename=os.path.basename(__file__))
 
 import time
 import datetime
-from collections import deque
-import cv2
-import numpy as np
 import objecttracker
+import multiprocessing
 from picamera.array import PiRGBArray
 from picamera import PiCamera
-import gc
 
 import logging
 # Define the logger
@@ -52,7 +49,7 @@ LOG.debug(args)
 def get_frames(frames_queue, resolution):
     camera = PiCamera()
     camera.resolution = resolution
-    camera.framerate = 30
+    camera.framerate = 16 #30
     # camera.iso = 800
     # camera.zoom = (0.1, 0.2, 0.9, 0.9)
 
@@ -64,7 +61,7 @@ def get_frames(frames_queue, resolution):
     LOG.debug("Setting shutter speed.")
     camera.shutter_speed = 2980  # camera.exposure_speed
     camera.exposure_mode = 'off'
-    LOG.debug(camera.shutter_speed)
+    LOG.info(camera.shutter_speed)
 
     LOG.debug("Setting white ballance.")
     # g = camera.awb_gains
@@ -113,6 +110,12 @@ if __name__ == "__main__":
     # E.g. [<timestamp>, <image>]
     frames_queue = multiprocessing.Queue()
 
+    # The queue to hold the foreground.
+    erode_queue = multiprocessing.Queue()
+    dilate_queue = multiprocessing.Queue()
+
+    clean_queue = multiprocessing.Queue()
+
     # The tracks to save queue is a queue of tracks to save.
     # Simple as that.
     tracks_to_save_queue = multiprocessing.Queue()
@@ -125,12 +128,36 @@ if __name__ == "__main__":
     frame_reader.start()
     LOG.info("Frames reader started.")
 
+    # Separates the foreground from the background
+    foreground_extractor = multiprocessing.Process(
+        target=objecttracker.foreground_extractor,
+        args=(frames_queue, erode_queue)
+        )
+    foreground_extractor.daemon = True
+    foreground_extractor.start()
+
+    # 
+    eroder = multiprocessing.Process(
+        target=objecttracker.eroder,
+        args=(erode_queue, dilate_queue)
+        )
+    eroder.daemon = True
+    eroder.start()
+
+    #
+    dilater = multiprocessing.Process(
+        target=objecttracker.dilater,
+        args=(dilate_queue, clean_queue)
+        )
+    dilater.daemon = True
+    dilater.start()
+
     # The counter creates tracks from the frames.
     # When a full track is created, it is inserted into
     # the tracks_to_save_queue.
     counter_process = multiprocessing.Process(
         target=objecttracker.counter,
-        args=(frames_queue, tracks_to_save_queue, track_match_radius)
+        args=(clean_queue, tracks_to_save_queue, track_match_radius)
         )
     counter_process.daemon = True
     counter_process.start()

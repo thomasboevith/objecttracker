@@ -72,7 +72,6 @@ def get_bounding_box(contour):
     """
     return cv2.boundingRect(contour)
 
-
 def get_trackpoints(fgmask, frame):
     """
     Gets the trackpoints from the foreground mask.
@@ -89,13 +88,15 @@ def get_trackpoints(fgmask, frame):
         # Only use contours of a certain size.
         if contour_area > min_object_area:
             cx, cy = get_centroid(cnt)
-            trackpoints.append(trackpoint.Trackpoint(frame[0], cx, cy, frame, size=contour_area))
+            stamp, img = frame
+            trackpoints.append(trackpoint.Trackpoint(stamp, cx, cy, img, size=contour_area))
     return trackpoints
 
-def get_tracks_to_save(fgbg, frame, tracks, track_match_radius):
+def get_foreground(fgbg, frame):
     stamp, img = frame
     # Extract background.
-    resolution = frame.shape[0:2]
+    resolution = img.shape[0:2]
+
     # Blur the frame a little.
     blurred_img = cv2.blur(img, (int(max(resolution)/100.0), )*2)
 
@@ -103,8 +104,9 @@ def get_tracks_to_save(fgbg, frame, tracks, track_match_radius):
     fgmask = fgbg.apply(blurred_img, learningRate=0.001)
 
     # Remove the smallest noise and holes in objects.
-    fgmask = erode_and_dilate(fgmask)
+    return fgmask, frame
 
+def get_tracks_to_save(fgmask, frame, tracks, track_match_radius):
     # Get all trackpoints.
     trackpoints = get_trackpoints(fgmask, frame)
 
@@ -201,12 +203,11 @@ def draw_tracks(tracks, frame):
         t.draw_points(frame)
 
 
-def erode_and_dilate(fgmask):
+def erode(fgmask):
     """
     To remove noise.
 
     Erode (makes the object bigger) to "swallow holes".
-    then dilate (reduces the object) again.
     """
     LOG.debug("Removing noise.")
 
@@ -215,27 +216,54 @@ def erode_and_dilate(fgmask):
     LOG.debug("Erode kernel size: '%s'."%(erode_kernel_size))
     ERODE_KERNEL = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (erode_kernel_size,)*2)
     fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, ERODE_KERNEL)
-    # cv2.imshow('eroded frame', fgmask)
-
-    LOG.debug("Dilating (making it bigger again).")
-    dilate_kernel_size = erode_kernel_size*3
-    DILATE_KERNEL = np.ones((dilate_kernel_size,)*2, np.uint8)
-    fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, DILATE_KERNEL, iterations=5)
-    # cv2.imshow('dilated frame', fgmask)
-
     return fgmask
 
-def counter(frames_queue, tracks_to_save_queue, track_match_radius):
+def dilate(fgmask):
+    """
+    then dilate (reduces the object) again.
+    """
+    LOG.debug("Dilating (making it bigger again).")
+    dilate_kernel_size = max(fgmask.shape[:2])/50
+    DILATE_KERNEL = np.ones((dilate_kernel_size,)*2, np.uint8)
+    fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, DILATE_KERNEL, iterations=5)
+    return fgmask
+
+def foreground_extractor(frames_queue, erode_queue):
+    fgbg = cv2.BackgroundSubtractorMOG()
+    while True:
+        LOG.debug("Waiting for a frame.")
+        LOG.debug("FOREGROUND: Number in queue: %i."%frames_queue.qsize())
+        frame = frames_queue.get(block=True)
+        LOG.debug("Got a frame.")
+        erode_queue.put(get_foreground(fgbg, frame))
+
+def eroder(erode_queue, dilate_queue):
+    while True:
+        LOG.debug("Waiting for a fgmask.")
+        LOG.debug("ERODER: Number in queue: %i."%erode_queue.qsize())
+        fgmask, frame = erode_queue.get(block=True)
+        LOG.debug("Got a fgmask.")
+        dilate_queue.put((erode(fgmask), frame))
+
+def dilater(dilate_queue, clean_queue):
+    while True:
+        LOG.debug("Waiting for a fgmask.")
+        LOG.debug("DILATER: Number in queue: %i."%dilate_queue.qsize())
+        fgmask, frame = dilate_queue.get(block=True)
+        LOG.debug("Got a fgmask.")
+        clean_queue.put((dilate(fgmask), frame))
+
+def counter(clean_queue, tracks_to_save_queue, track_match_radius):
     fgbg = cv2.BackgroundSubtractorMOG()
 
     tracks = []
     while True:
-        LOG.debug("Number of frames in queue: %i."%frames_queue.qsize())
-        LOG.debug("Waiting for a frame.")
-        frame = frames_queue.get(block=True)
-        LOG.debug("Got a frame.")
+        LOG.debug("Waiting for a clean mask.")
+        LOG.debug("COUNTER: Number in queue: %i."%clean_queue.qsize())
+        fgmask, frame = clean_queue.get(block=True)
 
-        tracks, tracks_to_save = get_tracks_to_save(fgbg, frame, tracks, track_match_radius)
+        LOG.debug("Got a clean mask.")
+        tracks, tracks_to_save = get_tracks_to_save(fgmask, frame, tracks, track_match_radius)
 
         for t in tracks_to_save:
             # Putting tracks to save in the save queue.
@@ -243,6 +271,9 @@ def counter(frames_queue, tracks_to_save_queue, track_match_radius):
 
 def save(tracks_to_save_queue, min_linear_length, track_match_radius, trackpoints_save_directory):
     while True:
+        LOG.debug("Waiting for a track to save.")
+        LOG.debug("Number of tracks to save in queue: %i."%tracks_to_save_queue.qsize())
         t = tracks_to_save_queue.get(block=True)
+        LOG.debug("Got a track to save.")
         t.save(min_linear_length, track_match_radius, trackpoints_save_directory)
         
