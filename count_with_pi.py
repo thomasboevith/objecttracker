@@ -20,6 +20,7 @@ import objecttracker
 import multiprocessing
 from picamera.array import PiRGBArray
 from picamera import PiCamera
+import cv2
 
 import logging
 # Define the logger
@@ -74,11 +75,12 @@ def get_frames(frames_queue, resolution):
         rawCapture.truncate(0)
 
 def save_frames(frames_queue):
-    stamp, frame = frames_queue.get(block=True)
-    directory = "/data/frames/%s" % stamp.strftime("%Y%m%dT%H")
-    if not os.path.isdir(directory):
-        os.makedirs(directory)
-    cv2.imwrite(os.path.join(directory, "%s.png" % stamp.isoformat()), frame)
+    while True:
+        stamp, frame = frames_queue.get(block=True)
+        directory = "/data/frames/%s" % stamp.strftime("%Y%m%dT%H")
+        if not os.path.isdir(directory):
+            os.makedirs(directory)
+        cv2.imwrite(os.path.join(directory, "%s.png" % stamp.isoformat()), frame)
 
 
 if __name__ == "__main__":
@@ -184,6 +186,13 @@ if __name__ == "__main__":
         track_saver.daemon = True
         track_saver.start()
         LOG.info("Track saver started.")
+
+    max_datetime = datetime.datetime(2015, 05, 03, 14)
+    while (datetime.datetime.now() < max_datetime):
+        print "Framesqueue: %i" % frames_queue.qsize()
+        time.sleep(10)
+        
+
 
     # Wait for all processes to end, which should never happen.
     frame_reader.join()
