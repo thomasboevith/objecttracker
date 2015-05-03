@@ -5,13 +5,15 @@ __doc__ = """Usage:
     {filename} [options] [--verbose|--debug] [[-s][-r]|--record-frames-only]
 
 Options:
-    -h, --help                  This help message.
-    -d, --debug                 Output a lot of info..
-    -v, --verbose               Output less less info.
-    --log-filename=logfilename  Name of the log file.
-    --record-frames-only        Only save the frames.
-    --tracks-save-path=path     Where to save the tracks,
-                                [default: /data/tracks].
+    -h, --help                    This help message.
+    -d, --debug                   Output a lot of info..
+    -v, --verbose                 Output less less info.
+    --log-filename=logfilename    Name of the log file.
+    --record-frames-only          Only save the frames.
+    --record-frames-path=<path>   Where to save the frames,
+                                  [default: /data/frames].
+    --tracks-save-path=<path>     Where to save the tracks,
+                                  [default: /data/tracks].
 """.format(filename=os.path.basename(__file__))
 
 import time
