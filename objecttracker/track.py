@@ -198,6 +198,9 @@ class Track:
         return expected_next_point
 
     def kalman(self, trackpoint):
+        """
+        Very simple implementation of a kalman filter.
+        """
         assert(isinstance(trackpoint, Trackpoint))
 
         expected_tp = self.expected_next_point()
@@ -214,12 +217,12 @@ class Track:
     def length_to(self, trackpoint):
         return self.trackpoints[-1].length_to(trackpoint)
 
-    def match(self, trackpoint, track_match_radius, size_match_ratio=0.7):
+    def match(self, trackpoint, track_match_radius, size_match_ratio=0.8):
         if self.length_to(trackpoint) < track_match_radius:
-            min_size = trackpoint.size * (1-size_match_ratio)
-            max_size = trackpoint.size * (1+size_match_ratio)
-            if min_size < self.avg_size() < max_size:
-                return True
+            #min_size = trackpoint.size * (1-size_match_ratio)
+            #max_size = trackpoint.size * (1+size_match_ratio)
+            #if min_size < self.avg_size() < max_size:
+            return True
         return False
 
     def draw_lines(self, frame, color=(255, 0, 255), thickness=1):

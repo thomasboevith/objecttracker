@@ -6,6 +6,7 @@ import connected_components
 import color
 import track
 import trackpoint
+import time
 
 import logging
 # Define the logger
@@ -98,7 +99,7 @@ def get_foreground(fgbg, frame):
     resolution = img.shape[0:2]
 
     # Blur the frame a little.
-    blurred_img = cv2.blur(img, (int(max(resolution)/100.0), )*2)
+    blurred_img = cv2.blur(img, (int(max(resolution)/50.0), )*2)
 
     # Subtract the foreground from the background.
     fgmask = fgbg.apply(blurred_img, learningRate=0.001)
@@ -115,44 +116,97 @@ def get_tracks_to_save(fgmask, frame, tracks, track_match_radius):
     return tracks, tracks_to_save
 
 def separate_tracks(trackpoints, tracks, track_match_radius):
+    """
+    Dividing tracks into the tracks to be saved and the other
+    tracks (the ones to keep adding to).
+    """
     LOG.debug("Separating tracks.")
 
     tracks = match_tracks(tracks, trackpoints, track_match_radius)
     for t in tracks: t.incr_age() 
-    tracks = prune_tracks(tracks)
+    tracks = prune_tracks(tracks)  # Removes old, very small tracks.
+
     tracks_to_save = []
     new_tracks = []
     for track in tracks:
-        if track.age > 5:
+        if track.age > 10:
             tracks_to_save.append(t)
         else:
             new_tracks.append(t)
-    tracks, tracks_to_save = connect_tracks(new_tracks, tracks_to_save, track_match_radius)
-    return tracks, tracks_to_save
+    # tracks, tracks_to_save = connect_tracks(tracks, tracks_to_save, track_match_radius)
+    return new_tracks, tracks_to_save
 
 def connect_tracks(tracks, tracks_to_save, track_match_radius):
+    """
+    If e.g. a car is hiding a bike, the bike disappears from the view
+    and the track ends. The next time the bike appears, it starts a new track
+    again. This function tries to connect the new and the old tracks.
+
+    TODO: It can clearly be expanded doing something more intelligent.
+    """
     LOG.debug("Connecting tracks")
+
+    # As the list need to be manipulated in the loops,
+    # new ones are created, to avoid assignment problems.
     new_tracks_to_save = []
+
     while len(tracks_to_save):
+        # The current track to save is popped from the list.
         track_to_save = tracks_to_save.pop()
+
+        # TODO: If the track ends in the center box, somehow, somewhere.
+
+        # Asuming that the track will still be saved unless
+        # a new track has been found.
         new_tracks_to_save.append(track_to_save)
 
-        last_tp = track_to_save.trackpoints[-1]
-        last_tp.sort_tracks_by_closest(tracks)
-        
+        # Get the next expected point for the current track.
+        next_trackpoint = track_to_save.expected_next_point()
+        if next_trackpoint is None:
+            # This should never happen because it means that 
+            # there is only one trackpoint in a track that is
+            # supposed to be saved...
+            next_trackpoint = track_to_save.trackpoints[-1]
+            # else:
+            # Use the kalman filter on it to reduce noise errors.
+            #    next_trackpoint = track_to_save.kalman(next_trackpoint)
+
+        # Sort the tracks by the closest track.
+        # If there are two tracks in the tracks list
+        # the one with the first trackpoint closest to the
+        # last trackpoint from the track to save comes
+        # first.
+        next_trackpoint.sort_tracks_by_closest(tracks)
+
+        # Now the closest track appears first in this loop.
         for t in tracks:
             first_tp = t.trackpoints[0]
-            if last_tp.length_to(first_tp) > track_match_radius*2:
+            # Is the current track close enough?
+            if next_trackpoint.length_to(first_tp) > track_match_radius*2:
+                # Guess not... Then the next is not close enough either.
+                # No track is close enough.
                 break
-            A = t.direction(deg=True)
-            B = track_to_save.direction(deg=True)
-            if A != None and B != None and np.abs(track.diff_degrees(A, B)) < 10:
-                new_tracks_to_save.remove(track_to_save)
-                track_to_save.connect(t)
-                tracks.append(track_to_save)
-                break
+
+            # Is the direction the same, or almost the same?
+            #A = t.direction(deg=True)  # Current track.
+            #B = track_to_save.direction(deg=True)  # The popped track.
+            #if A is not None and B is not None and np.abs(track.diff_degrees(A, B)) > 30:
+                # The direction is too differnt. Go on to
+                # the next track in the list.
+            #    continue
+
+            # All conditions were met so far. We have a match.
+            # Connect the current track to the new track.
+            new_tracks_to_save.remove(track_to_save)  # The asumption was not correct.
+            tracks.remove(t)  # This will be replaced by the new connected track below.
+            track_to_save.connect(t)  # Connect the two tracks.
+            tracks.append(track_to_save)  # The track will not be saved yet.
+            
+            # The match was found. We assume that this was the best match.
+            # TODO: The next one may actually be better. Or the next one thereafter.
+            break
     return tracks, new_tracks_to_save
-    
+
 def get_bgr_fgmask(fgmask):
     """
     Gets a coloured mask with bgr colours.
@@ -167,9 +221,16 @@ def match_tracks(tracks, trackpoints, track_match_radius):
     Matches trackpoints with the most suitable track.
     If not tracks to match, a new track is created.
     """
+    if len(trackpoints) > 0:
+        frame = trackpoints[0].frame
+        draw_tracks(tracks, frame)
+
     while len(trackpoints) > 0:
         tp = trackpoints.pop()
-        
+
+        tp.draw(frame)
+        tp.draw(frame, radius=track_match_radius, color=(255, 255, 0))
+
         matched = False
         closest_tracks = tp.sort_tracks_by_closest(tracks)
         # Find all the matching tracks.
@@ -184,15 +245,31 @@ def match_tracks(tracks, trackpoints, track_match_radius):
             t = track.Track()
             t.append(tp)
             tracks.append(t)
+
+    if len(trackpoints) > 0:
+        cv2.imshow("frame", frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            sys.exit()
+        time.sleep(1/6.0)
+
     return tracks
 
 def prune_tracks(tracks):
+    """
+    Removes tracks that are obviously not useful.
+    """
+    tracks_to_keep = []
     for t in tracks:
-        if t.age > 4:
-            if t.total_length() < 10:
-                tracks.remove(t)
-                continue
-    return tracks
+        if t.age < 6:
+            # Keep all newly updated tracks.
+            tracks_to_keep.append(t)
+            continue
+        if t.total_length() > 10:
+            # Keep all old tracks if the length is 
+            # long enough. Remove very small tracks.
+            tracks_to_keep.append(t)
+            continue
+    return tracks_to_keep
 
 def draw_tracks(tracks, frame):
     """
@@ -212,7 +289,7 @@ def erode(fgmask):
     LOG.debug("Removing noise.")
 
     LOG.debug("Eroding (making it smaller).")
-    erode_kernel_size = max(fgmask.shape[:2])/150
+    erode_kernel_size = max(fgmask.shape[:2])/100
     LOG.debug("Erode kernel size: '%s'."%(erode_kernel_size))
     ERODE_KERNEL = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (erode_kernel_size,)*2)
     fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, ERODE_KERNEL)
@@ -223,9 +300,9 @@ def dilate(fgmask):
     then dilate (reduces the object) again.
     """
     LOG.debug("Dilating (making it bigger again).")
-    dilate_kernel_size = max(fgmask.shape[:2])/50
+    dilate_kernel_size = min(fgmask.shape[:2])/50
     DILATE_KERNEL = np.ones((dilate_kernel_size,)*2, np.uint8)
-    fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, DILATE_KERNEL, iterations=5)
+    fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, DILATE_KERNEL, iterations=3)
     return fgmask
 
 def foreground_extractor(frames_queue, erode_queue):
@@ -259,7 +336,7 @@ def counter(clean_queue, tracks_to_save_queue, track_match_radius):
     tracks = []
     while True:
         LOG.debug("Waiting for a clean mask.")
-        LOG.debug("COUNTER: Number in queue: %i."%clean_queue.qsize())
+        LOG.debug("COUNTER: Number in queue: %i." % clean_queue.qsize())
         fgmask, frame = clean_queue.get(block=True)
 
         LOG.debug("Got a clean mask.")
@@ -268,6 +345,7 @@ def counter(clean_queue, tracks_to_save_queue, track_match_radius):
         for t in tracks_to_save:
             # Putting tracks to save in the save queue.
             tracks_to_save_queue.put(t)
+    cv2.destroyAllWindows()
 
 def save(tracks_to_save_queue, min_linear_length, track_match_radius, trackpoints_save_directory):
     while True:

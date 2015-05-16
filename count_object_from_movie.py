@@ -70,7 +70,7 @@ def start_counting(video_filename, video_speed=1, slow_down=False):
 
         cv2.imshow('frame', frame)
 
-        if cv2.waitKey(video_speed) & 0xFF == ord('q'):
+        if cv2.waitKey(0) & 0xFF == ord('q'):
             break
 
     print "FIN"

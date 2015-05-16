@@ -37,12 +37,12 @@ def get_frames(frames_queue, path):
         for filename in files:
             if filename.endswith(".png"):
                 # Example filename: 2015-05-03T12:55:15.462884.png
-                stamp = datetime.datetime.strptime(filename,
-                                                   "%Y-%m-%dT%H:%M:%S.%f.png")
+                stamp = datetime.datetime.strptime(
+                    filename,
+                    "%Y-%m-%dT%H:%M:%S.%f.png")
                 frames_queue.put(
                     [stamp,
-                     cv2.imread(os.path.join(root, filename))
-                     ]
+                     cv2.imread(os.path.join(root, filename))]
                     )
 
 
@@ -72,16 +72,11 @@ if __name__ == "__main__":
     # Each item is a list with a timestamp and an image:
     # E.g. [<timestamp>, <image>]
     frames_queue = multiprocessing.Queue()
-
-    # The queue to hold the foreground.
     erode_queue = multiprocessing.Queue()
     dilate_queue = multiprocessing.Queue()
-
     clean_queue = multiprocessing.Queue()
-
-    # The tracks to save queue is a queue of tracks to save.
-    # Simple as that.
-    tracks_to_save_queue = multiprocessing.Queue()
+    save_queue = multiprocessing.Queue()
+    temp_queue = multiprocessing.Queue()
 
     # The frame reader puts the frames into the frames queue.
     frame_reader = multiprocessing.Process(
@@ -99,6 +94,7 @@ if __name__ == "__main__":
     foreground_extractor.daemon = True
     foreground_extractor.start()
 
+    
     #
     eroder = multiprocessing.Process(
         target=objecttracker.eroder,
@@ -120,7 +116,7 @@ if __name__ == "__main__":
     # the tracks_to_save_queue.
     counter_process = multiprocessing.Process(
         target=objecttracker.counter,
-        args=(clean_queue, tracks_to_save_queue, track_match_radius)
+        args=(clean_queue, temp_queue, track_match_radius),
         )
     counter_process.daemon = True
     counter_process.start()
@@ -131,7 +127,7 @@ if __name__ == "__main__":
     track_saver = multiprocessing.Process(
         target=objecttracker.save,
         args=(
-            tracks_to_save_queue,
+            save_queue,
             min_linear_length,
             track_match_radius,
             trackpoints_save_directory))
@@ -139,17 +135,33 @@ if __name__ == "__main__":
     track_saver.start()
     LOG.info("Track saver started.")
 
+    d = datetime.datetime.now()
     while True:
-        print """Framesqueue: %i, erode_queue: %i, dilate_queue: %i,
+        if (datetime.datetime.now() - d).total_seconds() > 10:
+            d = datetime.datetime.now()
+            print """Framesqueue: %i, erode_queue: %i, dilate_queue: %i,
 clean_queue: %i, save_queue: %i.""" % (
-            frames_queue.qsize(),
-            erode_queue.qsize(),
-            dilate_queue.qsize(),
-            clean_queue.qsize(),
-            tracks_to_save_queue.qsize())
+                frames_queue.qsize(),
+                erode_queue.qsize(),
+                dilate_queue.qsize(),
+                clean_queue.qsize(),
+                save_queue.qsize())
+        out = temp_queue.get(block=True)
+        t = out
+        # fgmask, frame = out
+        # stamp, f = frame
+        for tp in t.trackpoints:
+            frame = tp.frame
+            t.draw_lines(frame)
+            t.draw_points(frame)
+            tp.draw(frame)
+            time.sleep(1/16.0)
+            # cv2.imshow("frame", frame)
 
-        time.sleep(10)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
 
+        
     # Wait for all processes to end, which should never happen.
     frame_reader.join()
     # counter_process.join()
