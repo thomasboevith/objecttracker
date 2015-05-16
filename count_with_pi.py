@@ -189,13 +189,6 @@ if __name__ == "__main__":
         track_saver.start()
         LOG.info("Track saver started.")
 
-    max_datetime = datetime.datetime(2015, 05, 03, 14)
-    while (datetime.datetime.now() < max_datetime):
-        print "Framesqueue: %i" % frames_queue.qsize()
-        time.sleep(10)
-        
-
-
     # Wait for all processes to end, which should never happen.
     frame_reader.join()
     # counter_process.join()

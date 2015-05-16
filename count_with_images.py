@@ -26,24 +26,41 @@ import datetime
 LOG = logging.getLogger(__name__)
 
 
-def get_frames(frames_queue, path):
+def get_frames(path, raw_frames):
     """
-    Inserts dates and frames into the frames queue.
-    The frames queue must be a multiprocessing.Queue.
+    Inserts frames into the raw frames queue.
+    Each frame gets a timestamp attached.
+
+    The raw frames must be a multiprocessing.Queue
+    (multiprocessing.queues.Queue).
     """
+    assert(isinstance(raw_frames, multiprocessing.queues.Queue))
+
+    # Find all the png files in path and its subdirectories.
     for root, dirs, files in os.walk(path):
-        LOG.debug("Dir, '%s': %i." % (root, len(files)))
+        LOG.debug("Current dir, '%s': %i files." % (root, len(files)))
+
+        # Sort the files. The files are saved by time stamp, so this
+        # ensures that the frames come in ascending order.
         files.sort()
+
+        # Find all the png files and put them into the raw frames
+        # queue / buffer.
         for filename in files:
+            # Filter out only files ending with png.
+            # Example filename: 2015-05-03T12:55:15.462884.png
             if filename.endswith(".png"):
-                # Example filename: 2015-05-03T12:55:15.462884.png
-                stamp = datetime.datetime.strptime(
+                # Extract the timestamp from the filename.
+                # Example filename above.
+                timestamp = datetime.datetime.strptime(
                     filename,
                     "%Y-%m-%dT%H:%M:%S.%f.png")
-                frames_queue.put(
-                    [stamp,
-                     cv2.imread(os.path.join(root, filename))]
-                    )
+
+                # Read the file into a frame , which is a numpy.ndarray.
+                raw_frame = cv2.imread(os.path.join(root, filename))
+
+                # Put the frame and timestamp into the buffer / queue.
+                raw_frames.put([raw_frame, timestamp])
 
 
 if __name__ == "__main__":
@@ -71,42 +88,50 @@ if __name__ == "__main__":
     # The frames queue is a list queue with list items.
     # Each item is a list with a timestamp and an image:
     # E.g. [<timestamp>, <image>]
-    frames_queue = multiprocessing.Queue()
-    erode_queue = multiprocessing.Queue()
-    dilate_queue = multiprocessing.Queue()
-    clean_queue = multiprocessing.Queue()
-    save_queue = multiprocessing.Queue()
+    raw_frames = multiprocessing.Queue()
+    foreground_frames = multiprocessing.Queue()
+    eroded_frames = multiprocessing.Queue()
+    dilated_frames = multiprocessing.Queue()
+    tracks_to_save = multiprocessing.Queue()
     temp_queue = multiprocessing.Queue()
 
-    # The frame reader puts the frames into the frames queue.
+    # The only purpose of the framereader is to read the frames
+    # from the camera / directory and put them into a buffer (frames queue).
+    # If the buffer is filled, e.g. if it increases all the time
+    # maybe the resolution is too large. It might also be that
+    # some of the subsequent processes are too slow and maybe should
+    # be adjusted.
     frame_reader = multiprocessing.Process(
         target=get_frames,
-        args=(frames_queue, args['<image_directory>']))
+        args=(args['<image_directory>'], raw_frames)
+        )
     frame_reader.daemon = True
     frame_reader.start()
     LOG.info("Frames reader started.")
 
-    # Separates the foreground from the background
+    # The main purpose of the foreground extractor is to
+    # separate the foreground from the background.
     foreground_extractor = multiprocessing.Process(
         target=objecttracker.foreground_extractor,
-        args=(frames_queue, erode_queue)
+        args=(raw_frames, foreground_frames)
         )
     foreground_extractor.daemon = True
     foreground_extractor.start()
 
-    
-    #
+    # The erode process takes a foreground frame and erodes the
+    # white pixels.
     eroder = multiprocessing.Process(
         target=objecttracker.eroder,
-        args=(erode_queue, dilate_queue)
+        args=(foreground_frames, eroded_frames)
         )
     eroder.daemon = True
     eroder.start()
 
-    #
+    # The dilate process dilates the foreground frame. This is done
+    # after the erode process so that the frame is eroded and dilated.
     dilater = multiprocessing.Process(
         target=objecttracker.dilater,
-        args=(dilate_queue, clean_queue)
+        args=(eroded_frames, dilated_frames)
         )
     dilater.daemon = True
     dilater.start()
@@ -116,7 +141,7 @@ if __name__ == "__main__":
     # the tracks_to_save_queue.
     counter_process = multiprocessing.Process(
         target=objecttracker.counter,
-        args=(clean_queue, temp_queue, track_match_radius),
+        args=(dilated_frames, tracks_to_save, track_match_radius),
         )
     counter_process.daemon = True
     counter_process.start()
@@ -125,9 +150,9 @@ if __name__ == "__main__":
     # The track saver saves the tracks that needs to be saved.
     # It also puts the data into the database.
     track_saver = multiprocessing.Process(
-        target=objecttracker.save,
+        target=objecttracker.track_saver,
         args=(
-            save_queue,
+            tracks_to_save,
             min_linear_length,
             track_match_radius,
             trackpoints_save_directory))
@@ -139,13 +164,14 @@ if __name__ == "__main__":
     while True:
         if (datetime.datetime.now() - d).total_seconds() > 10:
             d = datetime.datetime.now()
-            print """Framesqueue: %i, erode_queue: %i, dilate_queue: %i,
-clean_queue: %i, save_queue: %i.""" % (
-                frames_queue.qsize(),
-                erode_queue.qsize(),
-                dilate_queue.qsize(),
-                clean_queue.qsize(),
-                save_queue.qsize())
+            print """Raw frames: %i, foreground frames: %i, eroded frames: %i,
+dilated frames: %i, frames to save: %i.""" % (
+                raw_frames.qsize(),
+                foreground_frames.qsize(),
+                eroded_frames.qsize(),
+                dilated_frames.qsize(),
+                tracks_to_save.qsize())
+
         out = temp_queue.get(block=True)
         t = out
         # fgmask, frame = out
@@ -161,7 +187,6 @@ clean_queue: %i, save_queue: %i.""" % (
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
-        
     # Wait for all processes to end, which should never happen.
     frame_reader.join()
     # counter_process.join()
