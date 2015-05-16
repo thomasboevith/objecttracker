@@ -61,6 +61,9 @@ def get_frames(path, raw_frames):
 
                 # Put the frame and timestamp into the buffer / queue.
                 raw_frames.put([raw_frame, timestamp])
+                
+                if raw_frames.qsize() > 100:
+                    time.sleep(1)
 
 
 if __name__ == "__main__":
@@ -141,7 +144,7 @@ if __name__ == "__main__":
     # the tracks_to_save_queue.
     counter_process = multiprocessing.Process(
         target=objecttracker.counter,
-        args=(dilated_frames, tracks_to_save, track_match_radius),
+        args=(dilated_frames, temp_queue, track_match_radius), #tracks_to_save, track_match_radius),
         )
     counter_process.daemon = True
     counter_process.start()
@@ -157,7 +160,7 @@ if __name__ == "__main__":
             track_match_radius,
             trackpoints_save_directory))
     track_saver.daemon = True
-    track_saver.start()
+    # track_saver.start()
     LOG.info("Track saver started.")
 
     d = datetime.datetime.now()
@@ -174,16 +177,17 @@ dilated frames: %i, frames to save: %i.""" % (
 
         out = temp_queue.get(block=True)
         t = out
-        # fgmask, frame = out
-        # stamp, f = frame
+        # fgmask, raw_frame, timestamp = out
+        # raw_frame, timestamp = out
+        
         for tp in t.trackpoints:
             frame = tp.frame
             t.draw_lines(frame)
             t.draw_points(frame)
             tp.draw(frame)
+            cv2.imshow("Raw Frame", frame)
             time.sleep(1/16.0)
-            # cv2.imshow("frame", frame)
-
+            # cv2.imshow("fgmask", fgmask)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 

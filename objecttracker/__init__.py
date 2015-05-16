@@ -285,11 +285,12 @@ def erode(frame):
     """
     To remove noise.
 
-    Erode (makes the object bigger) to "swallow holes".
+    Erode (makes black areas bigger) to "swallow white holes".
+    That is, remove very small white areas.
     """
     # Setting the kernel.
-    LOG.debug("Eroding (making it bigger).")
-    erode_kernel_size = max(frame.shape[:2])/100
+    LOG.debug("Eroding (making the black bigger).")
+    erode_kernel_size = max(frame.shape[:2])/50
     LOG.debug("Erode kernel size: '%s'."%(erode_kernel_size))
     ERODE_KERNEL = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (erode_kernel_size,)*2)
 
@@ -299,7 +300,7 @@ def erode(frame):
 
 def dilate(frame):
     """
-    Then dilate (reduces the object) again.
+    Reduces the black area to make the white areas bigger again.
     """
     # Setting the dilation kernel.
     LOG.debug("Dilating (making it smaller again).")
@@ -307,7 +308,7 @@ def dilate(frame):
     DILATE_KERNEL = np.ones((dilate_kernel_size,)*2, np.uint8)
 
     # Do the dilation.
-    dilated_frame = cv2.morphologyEx(frame, cv2.MORPH_CLOSE, DILATE_KERNEL, iterations=3)
+    dilated_frame = cv2.morphologyEx(frame, cv2.MORPH_CLOSE, DILATE_KERNEL) #, iterations=1)
     return dilated_frame
 
 def foreground_extractor(raw_frames, foreground_frames):
@@ -363,8 +364,8 @@ def counter(input_frames, output_tracks, track_match_radius):
 
 def track_saver(input_queue, min_linear_length, track_match_radius, trackpoints_save_directory):
     while True:
-        LOG.info("Tracksaver: Waiting for a track to save.")
-        t = input_queue.get(block=True)
+        LOG.debug("Tracksaver: Waiting for a track to save.")
+        track_to_save = input_queue.get(block=True)
         LOG.debug("Tracksaver: Got a track to save. Number of tracks to save in queue: %i."%input_queue.qsize())
-        t.save(min_linear_length, track_match_radius, trackpoints_save_directory)
+        track_to_save.save(min_linear_length, track_match_radius, trackpoints_save_directory)
         
