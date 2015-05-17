@@ -5,17 +5,26 @@ __doc__ = """Usage:
     {filename} [options] [--verbose|--debug] [[-s][-r]|--record-frames-only]
 
 Options:
-    -h, --help                    This help message.
-    -d, --debug                   Output a lot of info..
-    -v, --verbose                 Output less less info.
-    --log-filename=logfilename    Name of the log file.
-    --record-frames-only          Only save the frames.
-    --frame-rate=<framerate>      The camera frame rate. I.e. number of images / second.
-                                  [default: 14].
-    --record-frames-path=<path>   Where to save the frames,
-                                  [default: /data/frames].
-    --tracks-save-path=<path>     Where to save the tracks,
-                                  [default: /data/tracks].
+    -h, --help                      This help message.
+    -d, --debug                     Output a lot of info..
+    -v, --verbose                   Output less less info.
+    --log-filename=logfilename      Name of the log file.
+    --record-frames-only            Only save the frames.
+    --track-match-radius=<radius>   Track match radius. When a trackpoint is found, the matching track
+                                    must be within this radius from the last point in a track, to match
+                                    the track.
+                                                          ___
+                                                         /   \ 
+                                      o---o----o---o----(--o  ) The new trackpoint must be within the track radius.
+                                                         \___/ 
+
+                                    If not set, default value is calculated from frame size and framerate.
+    --frame-rate=<framerate>        The camera frame rate. I.e. number of images / second.
+                                    [default: 14].
+    --record-frames-path=<path>     Where to save the frames.
+                                    [default: /data/frames].
+    --tracks-save-path=<path>       Where to save the tracks,
+                                    [default: /data/tracks].
 """.format(filename=os.path.basename(__file__))
 
 import time
@@ -57,15 +66,16 @@ def get_frames(frames_queue, resolution, framerate):
     LOG.info("Warming up camera. Sleeping for %i seconds." % (sleeptime_s))
     time.sleep(sleeptime_s)
 
-    camera.shutter_speed = 2980  # camera.exposure_speed
+    camera.shutter_speed = 2980  # = camera.exposure_speed
+    # camera.shutter_speed  at midnight: 0
     camera.exposure_mode = 'off'
     LOG.info("Camera shutter speed: %i"%camera.shutter_speed)
 
-    # g = camera.awb_gains
     camera.awb_mode = 'off'
     LOG.info("Camera auto white ballance: %s"%(camera.awb_mode))
 
     camera.awb_gains = (1.4, 1.2)
+    # Camera awb_gains at midnight: (77/64, 191/128)
     LOG.info("Auto white ballance gains: (%s, %s)"%(camera.awb_gains))
 
     LOG.info("Camera ready.")
@@ -75,12 +85,14 @@ def get_frames(frames_queue, resolution, framerate):
                                            format="bgr",
                                            use_video_port=True):
         frames_queue.put([frame.array, datetime.datetime.now()])
+        # TODO: Set camera attributes by time or camera darkness or something.
+        # It should change very slowly.
         rawCapture.truncate(0)
 
-def save_frames(frames_queue):
+def save_frames(frames_queue, save_path):
     while True:
         stamp, frame = frames_queue.get(block=True)
-        directory = "/data/frames/%s" % stamp.strftime("%Y%m%dT%H")
+        directory = os.path.join(savepath, stamp.strftime("%Y%m%dT%H"))
         if not os.path.isdir(directory):
             os.makedirs(directory)
         cv2.imwrite(os.path.join(directory, "%s.png" % stamp.isoformat()), frame)
@@ -106,7 +118,11 @@ if __name__ == "__main__":
     # args['--record-frames']
     resolution = (640/2, 480/2)
     min_linear_length = max(resolution) / 2
-    track_match_radius = 2 * min_linear_length / int(args['--frame-rate'])
+    if args['--track-match-radius'] != None:
+        track_match_radius = int(args['--track-match-radius'])
+    else:
+        track_match_radius = 2 * min_linear_length / int(args['--frame-rate'])
+    LOG.info("Track match radius: %i"%(track_match_radius))
 
     # Where the tracks are saved.
     trackpoints_save_directory = args["--tracks-save-path"]
@@ -128,7 +144,7 @@ if __name__ == "__main__":
     if args['--record-frames-only']:
         frame_saver = multiprocessing.Process(
             target = save_frames,
-            args=(raw_frames,)
+            args=(raw_frames, args['--record-frames-path'])
             )
         frame_saver.daemon = True
         frame_saver.start()
