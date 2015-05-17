@@ -203,7 +203,7 @@ def match_trackpoints_with_tracks(trackpoints, tracks, track_match_radius):
             LOG.debug("Adding track %s"%(t))
             tracks.append(t)
         else:
-            LOG.info("Best matched track age: %s"% best_matched_track.age)
+            LOG.debug("Best matched track age: %s"% best_matched_track.age)
             LOG.debug("Track was matched.")
             best_matched_track.append(best_matched_track.kalman(tp))
     return tracks
@@ -319,8 +319,8 @@ def counter(input_frames, output_tracks, track_match_radius):
 
 def track_saver(input_queue, min_linear_length, track_match_radius, trackpoints_save_directory):
     while True:
-        LOG.debug("Tracksaver: Waiting for a track to save.")
+        LOG.info("Tracksaver: Waiting for a track to save.")
         track_to_save = input_queue.get(block=True)
-        LOG.debug("Tracksaver: Got a track to save. Number of tracks to save in queue: %i."%input_queue.qsize())
+        LOG.info("Tracksaver: Got a track to save. Number of tracks to save in queue: %i."%input_queue.qsize())
         track_to_save.save(min_linear_length, track_match_radius, trackpoints_save_directory)
         

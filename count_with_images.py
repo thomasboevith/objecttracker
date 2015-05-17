@@ -148,7 +148,8 @@ if __name__ == "__main__":
     # the tracks_to_save_queue.
     counter_process = multiprocessing.Process(
         target=objecttracker.counter,
-        args=(dilated_frames, temp_queue, track_match_radius), #tracks_to_save, track_match_radius),
+        # args=(dilated_frames, temp_queue, track_match_radius)
+        args=(dilated_frames, tracks_to_save, track_match_radius)
         )
     counter_process.daemon = True
     counter_process.start()
@@ -164,7 +165,7 @@ if __name__ == "__main__":
             track_match_radius,
             trackpoints_save_directory))
     track_saver.daemon = True
-    # track_saver.start()
+    track_saver.start()
     LOG.info("Track saver started.")
 
     d = datetime.datetime.now()
@@ -178,6 +179,8 @@ dilated frames: %i, frames to save: %i.""" % (
                 eroded_frames.qsize(),
                 dilated_frames.qsize(),
                 tracks_to_save.qsize())
+        """
+
 
         out = temp_queue.get(block=True)
         t = out
@@ -194,7 +197,7 @@ dilated frames: %i, frames to save: %i.""" % (
             # cv2.imshow("fgmask", fgmask)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-
+                """
     # Wait for all processes to end, which should never happen.
     frame_reader.join()
     # counter_process.join()
