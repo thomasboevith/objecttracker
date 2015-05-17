@@ -319,8 +319,8 @@ def counter(input_frames, output_tracks, track_match_radius):
 
 def track_saver(input_queue, min_linear_length, track_match_radius, trackpoints_save_directory):
     while True:
-        LOG.info("Tracksaver: Waiting for a track to save.")
+        LOG.debug("Tracksaver: Waiting for a track to save.")
         track_to_save = input_queue.get(block=True)
-        LOG.info("Tracksaver: Got a track to save. Number of tracks to save in queue: %i."%input_queue.qsize())
+        LOG.debug("Tracksaver: Got a track to save. Number of tracks to save in queue: %i."%input_queue.qsize())
         track_to_save.save(min_linear_length, track_match_radius, trackpoints_save_directory)
         

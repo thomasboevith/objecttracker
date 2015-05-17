@@ -46,9 +46,9 @@ LOG.debug(args)
 def get_frames(frames_queue, resolution):
     camera = PiCamera()
     camera.resolution = resolution
-    camera.framerate = 16 #30
+    camera.framerate = 14 # 16 #30
     # camera.iso = 800
-    # camera.zoom = (0.1, 0.2, 0.9, 0.9)
+    camera.zoom = (0.1, 0.2, 0.9, 0.9)
 
     # Allow the camera to warmup
     sleeptime_s = 2
