@@ -131,8 +131,9 @@ def separate_tracks(trackpoints, tracks, track_match_radius):
 
     for t in tracks: t.incr_age()
         
-    # Remove old tracks that are small.
-    tracks = prune_tracks(tracks)
+    # Remove old tracks that are smaller than the diameter of the
+    # match circle.
+    tracks = prune_tracks(tracks, track_match_radius*2)
 
     # Split old and new tracks.
     tracks_to_save = []
@@ -208,7 +209,7 @@ def match_trackpoints_with_tracks(trackpoints, tracks, track_match_radius):
             best_matched_track.append(best_matched_track.kalman(tp))
     return tracks
 
-def prune_tracks(tracks):
+def prune_tracks(tracks, min_track_length):
     """
     Removes tracks that are obviously not useful.
     """
@@ -220,7 +221,7 @@ def prune_tracks(tracks):
             continue
 
         # Age is larger than above.
-        if t.total_length() > 10:
+        if t.total_length() > min_track_length:
             # Keep all old tracks if the length is 
             # long enough. Remove very small tracks.
             tracks_to_keep.append(t)

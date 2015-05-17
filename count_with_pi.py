@@ -10,6 +10,8 @@ Options:
     -v, --verbose                 Output less less info.
     --log-filename=logfilename    Name of the log file.
     --record-frames-only          Only save the frames.
+    --frame-rate=<framerate>      The camera frame rate. I.e. number of images / second.
+                                  [default: 14].
     --record-frames-path=<path>   Where to save the frames,
                                   [default: /data/frames].
     --tracks-save-path=<path>     Where to save the tracks,
@@ -43,10 +45,10 @@ else:
 LOG.debug(args)
 
 
-def get_frames(frames_queue, resolution):
+def get_frames(frames_queue, resolution, framerate):
     camera = PiCamera()
     camera.resolution = resolution
-    camera.framerate = 14 # 16 #30
+    camera.framerate = framerate # 16 #30
     # camera.iso = 800
     camera.zoom = (0.1, 0.2, 0.9, 0.9)
 
@@ -55,17 +57,16 @@ def get_frames(frames_queue, resolution):
     LOG.info("Warming up camera. Sleeping for %i seconds." % (sleeptime_s))
     time.sleep(sleeptime_s)
 
-    LOG.debug("Setting shutter speed.")
     camera.shutter_speed = 2980  # camera.exposure_speed
     camera.exposure_mode = 'off'
-    LOG.info(camera.shutter_speed)
+    LOG.info("Camera shutter speed: %i"%camera.shutter_speed)
 
-    LOG.debug("Setting white ballance.")
     # g = camera.awb_gains
     camera.awb_mode = 'off'
-    # (Fraction(379, 256), Fraction(311, 256))
+    LOG.info("Camera auto white ballance: %s"%(camera.awb_mode))
+
     camera.awb_gains = (1.4, 1.2)
-    LOG.info(camera.awb_gains)
+    LOG.info("Auto white ballance gains: (%s, %s)"%(camera.awb_gains))
 
     LOG.info("Camera ready.")
     rawCapture = PiRGBArray(camera, size=camera.resolution)
@@ -105,7 +106,7 @@ if __name__ == "__main__":
     # args['--record-frames']
     resolution = (640/2, 480/2)
     min_linear_length = max(resolution) / 2
-    track_match_radius = min_linear_length / 7
+    track_match_radius = 2 * min_linear_length / int(args['--frame-rate'])
 
     # Where the tracks are saved.
     trackpoints_save_directory = args["--tracks-save-path"]
@@ -119,7 +120,7 @@ if __name__ == "__main__":
     # The frame reader puts the frames into the frames queue.
     frame_reader = multiprocessing.Process(
         target=get_frames,
-        args=(raw_frames, resolution))
+        args=(raw_frames, resolution, int(args['--frame-rate'])))
     frame_reader.daemon = True
     frame_reader.start()
     LOG.info("Frames reader started.")
