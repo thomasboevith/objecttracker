@@ -73,7 +73,7 @@ def get_frames(frames_queue, resolution):
     for frame in camera.capture_continuous(rawCapture,
                                            format="bgr",
                                            use_video_port=True):
-        frames_queue.put([datetime.datetime.now(), frame.array])
+        frames_queue.put([frame.array, datetime.datetime.now()])
         rawCapture.truncate(0)
 
 def save_frames(frames_queue):
@@ -110,25 +110,16 @@ if __name__ == "__main__":
     # Where the tracks are saved.
     trackpoints_save_directory = args["--tracks-save-path"]
 
-    # The frames queue is a list queue with list items.
-    # Each item is a list with a timestamp and an image:
-    # E.g. [<timestamp>, <image>]
-    frames_queue = multiprocessing.Queue()
-
-    # The queue to hold the foreground.
-    erode_queue = multiprocessing.Queue()
-    dilate_queue = multiprocessing.Queue()
-
-    clean_queue = multiprocessing.Queue()
-
-    # The tracks to save queue is a queue of tracks to save.
-    # Simple as that.
-    tracks_to_save_queue = multiprocessing.Queue()
+    raw_frames = multiprocessing.Queue()
+    foreground_frames = multiprocessing.Queue()
+    eroded_frames = multiprocessing.Queue()
+    dilated_frames = multiprocessing.Queue()
+    tracks_to_save = multiprocessing.Queue()
 
     # The frame reader puts the frames into the frames queue.
     frame_reader = multiprocessing.Process(
         target=get_frames,
-        args=(frames_queue, resolution))
+        args=(raw_frames, resolution))
     frame_reader.daemon = True
     frame_reader.start()
     LOG.info("Frames reader started.")
@@ -136,41 +127,48 @@ if __name__ == "__main__":
     if args['--record-frames-only']:
         frame_saver = multiprocessing.Process(
             target = save_frames,
-            args=(frames_queue,)
+            args=(raw_frames,)
             )
         frame_saver.daemon = True
         frame_saver.start()
     else:
-        # Separates the foreground from the background
+        # The main purpose of the foreground extractor is to
+        # separate the foreground from the background.
         foreground_extractor = multiprocessing.Process(
             target=objecttracker.foreground_extractor,
-            args=(frames_queue, erode_queue)
+            args=(raw_frames, foreground_frames)
             )
         foreground_extractor.daemon = True
         foreground_extractor.start()
 
-        # 
+        # The erode process takes a foreground frame and erodes the
+        # white pixels.
         eroder = multiprocessing.Process(
             target=objecttracker.eroder,
-            args=(erode_queue, dilate_queue)
+            args=(foreground_frames, eroded_frames)
             )
         eroder.daemon = True
         eroder.start()
+        LOG.info("Eroder started.")
+    
 
-        #
+        # The dilate process dilates the foreground frame. This is done
+        # after the erode process so that the frame is eroded and dilated.
         dilater = multiprocessing.Process(
             target=objecttracker.dilater,
-            args=(dilate_queue, clean_queue)
+            args=(eroded_frames, dilated_frames)
             )
         dilater.daemon = True
         dilater.start()
+        LOG.info("Dilater started.")
 
         # The counter creates tracks from the frames.
         # When a full track is created, it is inserted into
         # the tracks_to_save_queue.
         counter_process = multiprocessing.Process(
             target=objecttracker.counter,
-            args=(clean_queue, tracks_to_save_queue, track_match_radius)
+            # args=(dilated_frames, temp_queue, track_match_radius)
+            args=(dilated_frames, tracks_to_save, track_match_radius)
             )
         counter_process.daemon = True
         counter_process.start()
@@ -179,9 +177,9 @@ if __name__ == "__main__":
         # The track saver saves the tracks that needs to be saved.
         # It also puts the data into the database.
         track_saver = multiprocessing.Process(
-            target=objecttracker.save,
+            target=objecttracker.track_saver,
             args=(
-                tracks_to_save_queue,
+                tracks_to_save,
                 min_linear_length,
                 track_match_radius,
                 trackpoints_save_directory))
@@ -189,9 +187,18 @@ if __name__ == "__main__":
         track_saver.start()
         LOG.info("Track saver started.")
 
+        d = datetime.datetime.now()
+        while True:
+            if (datetime.datetime.now() - d).total_seconds() > 10:
+                d = datetime.datetime.now()
+                print """Raw frames: %i, foreground frames: %i, eroded frames: %i,
+dilated frames: %i, frames to save: %i.""" % (
+                    raw_frames.qsize(),
+                    foreground_frames.qsize(),
+                    eroded_frames.qsize(),
+                    dilated_frames.qsize(),
+                    tracks_to_save.qsize())
+
     # Wait for all processes to end, which should never happen.
     frame_reader.join()
-    # counter_process.join()
-    # track_saver.join()
-
     print "FIN"
