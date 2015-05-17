@@ -105,7 +105,7 @@ if __name__ == "__main__":
     # args['--record-frames']
     resolution = (640/2, 480/2)
     min_linear_length = max(resolution) / 2
-    track_match_radius = min_linear_length / 10
+    track_match_radius = min_linear_length / 7
 
     # Where the tracks are saved.
     trackpoints_save_directory = args["--tracks-save-path"]
@@ -189,7 +189,7 @@ if __name__ == "__main__":
 
         d = datetime.datetime.now()
         while True:
-            if (datetime.datetime.now() - d).total_seconds() > 10:
+            if (datetime.datetime.now() - d).total_seconds() > 100:
                 d = datetime.datetime.now()
                 print """Raw frames: %i, foreground frames: %i, eroded frames: %i,
 dilated frames: %i, frames to save: %i.""" % (
