@@ -1,5 +1,10 @@
 import numpy as np
+import sys
 import cv2
+import logging
+
+# Define the logger
+LOG = logging.getLogger(__name__)
 
 
 class Trackpoint:
@@ -63,3 +68,17 @@ class Trackpoint:
         """
         tracks.sort(key=lambda t: t.length_to(self))
         return tracks
+
+    def get_best_match(self, tracks, track_match_radius):
+        best_match_track = None
+        best_match_score = 0
+
+        for t in tracks:
+            match_score = t.match_score(self, track_match_radius)
+            if match_score > best_match_score:
+                best_match_score = match_score
+                best_match_track = t
+
+        LOG.debug("Best match score: %f. Returning track: %s."%(best_match_score, best_match_track))
+        if best_match_track != None: LOG.debug("RETURNING track age: %s"%best_match_track.age)
+        return best_match_track

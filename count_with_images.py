@@ -84,6 +84,7 @@ if __name__ == "__main__":
     resolution = (320, 240)
     min_linear_length = max(resolution) / 2
     track_match_radius = min_linear_length / 10
+    print track_match_radius
 
     # Where the tracks are saved.
     trackpoints_save_directory = args["--tracks-save-path"]
@@ -129,6 +130,8 @@ if __name__ == "__main__":
         )
     eroder.daemon = True
     eroder.start()
+    LOG.info("Eroder started.")
+    
 
     # The dilate process dilates the foreground frame. This is done
     # after the erode process so that the frame is eroded and dilated.
@@ -138,6 +141,7 @@ if __name__ == "__main__":
         )
     dilater.daemon = True
     dilater.start()
+    LOG.info("Dilater started.")
 
     # The counter creates tracks from the frames.
     # When a full track is created, it is inserted into
@@ -185,7 +189,7 @@ dilated frames: %i, frames to save: %i.""" % (
             t.draw_lines(frame)
             t.draw_points(frame)
             tp.draw(frame)
-            cv2.imshow("Raw Frame", frame)
+            cv2.imshow("Frame", frame)
             time.sleep(1/16.0)
             # cv2.imshow("fgmask", fgmask)
             if cv2.waitKey(1) & 0xFF == ord('q'):

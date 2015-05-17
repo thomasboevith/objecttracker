@@ -113,7 +113,7 @@ def get_tracks_to_save(fgmask, raw_frame, timestamp, tracks, track_match_radius)
     trackpoints = get_trackpoints(fgmask, raw_frame, timestamp)
 
     # Match the tracks with the trackpoints.
-    tracks, tracks_to_save = separate_tracks(trackpoints, tracks, track_match_radius)
+    tracks, tracks_to_save = separate_tracks(trackpoints, tracks, track_match_radius) 
     return tracks, tracks_to_save
 
 def separate_tracks(trackpoints, tracks, track_match_radius):
@@ -122,20 +122,31 @@ def separate_tracks(trackpoints, tracks, track_match_radius):
     tracks (the ones to keep adding to).
     """
     LOG.debug("Separating tracks.")
+ 
+    # LOG.info("Tracks: %i %i"%(len(tracks), len(trackpoints)))
+    # print tracks
+    LOG.debug("Inden: Tracks: %i %i"%(len(tracks), len(trackpoints)))
+    tracks = match_trackpoints_with_tracks(trackpoints, tracks, track_match_radius)
+    LOG.debug("Efter: tracks: %i %i"%(len(tracks), len(trackpoints)))
 
-    tracks = match_tracks(tracks, trackpoints, track_match_radius)
-    for t in tracks: t.incr_age() 
-    tracks = prune_tracks(tracks)  # Removes old, very small tracks.
+    for t in tracks: t.incr_age()
+        
+    # Remove old tracks that are small.
+    tracks = prune_tracks(tracks)
 
+    # Split old and new tracks.
     tracks_to_save = []
     new_tracks = []
-    for track in tracks:
-        if track.age > 10:
+    for t in tracks:
+        if t.age > 10:
             tracks_to_save.append(t)
         else:
             new_tracks.append(t)
-    # tracks, tracks_to_save = connect_tracks(tracks, tracks_to_save, track_match_radius)
-    return new_tracks, tracks_to_save
+
+    # Connect possible small tracks.
+    tracks = new_tracks
+    tracks, tracks_to_save = connect_tracks(tracks, tracks_to_save, track_match_radius)
+    return tracks, tracks_to_save
 
 def connect_tracks(tracks, tracks_to_save, track_match_radius):
     """
@@ -143,69 +154,28 @@ def connect_tracks(tracks, tracks_to_save, track_match_radius):
     and the track ends. The next time the bike appears, it starts a new track
     again. This function tries to connect the new and the old tracks.
 
-    TODO: It can clearly be expanded doing something more intelligent.
+    TODO: It can clearly be extended to do something more intelligent.
     """
     LOG.debug("Connecting tracks")
-
-    # As the list need to be manipulated in the loops,
-    # new ones are created, to avoid assignment problems.
     new_tracks_to_save = []
+    new_tracks = []
+    for track_to_save in tracks_to_save:
+        matched_track = None
+        max_score = 0
 
-    while len(tracks_to_save):
-        # The current track to save is popped from the list.
-        track_to_save = tracks_to_save.pop()
+        for match_track in tracks:
+            score = track_to_save.match_score(match_track.first_trackpoint, track_match_radius*3)
+            if score > max_score:
+                matched_track = match_track
+                max_score = score
 
-        # TODO: If the track ends in the center box, somehow, somewhere.
+        if matched_track != None and max_score > 0.3:
+            tracks.remove(matched_track)
+            tracks.append(track_to_save)
+            track_to_save.connect_tracks(matched_track)
+        else:
+            new_tracks_to_save.append(track_to_save)
 
-        # Asuming that the track will still be saved unless
-        # a new track has been found.
-        new_tracks_to_save.append(track_to_save)
-
-        # Get the next expected point for the current track.
-        next_trackpoint = track_to_save.expected_next_point()
-        if next_trackpoint is None:
-            # This should never happen because it means that 
-            # there is only one trackpoint in a track that is
-            # supposed to be saved...
-            next_trackpoint = track_to_save.trackpoints[-1]
-            # else:
-            # Use the kalman filter on it to reduce noise errors.
-            #    next_trackpoint = track_to_save.kalman(next_trackpoint)
-
-        # Sort the tracks by the closest track.
-        # If there are two tracks in the tracks list
-        # the one with the first trackpoint closest to the
-        # last trackpoint from the track to save comes
-        # first.
-        next_trackpoint.sort_tracks_by_closest(tracks)
-
-        # Now the closest track appears first in this loop.
-        for t in tracks:
-            first_tp = t.trackpoints[0]
-            # Is the current track close enough?
-            if next_trackpoint.length_to(first_tp) > track_match_radius*2:
-                # Guess not... Then the next is not close enough either.
-                # No track is close enough.
-                break
-
-            # Is the direction the same, or almost the same?
-            #A = t.direction(deg=True)  # Current track.
-            #B = track_to_save.direction(deg=True)  # The popped track.
-            #if A is not None and B is not None and np.abs(track.diff_degrees(A, B)) > 30:
-                # The direction is too differnt. Go on to
-                # the next track in the list.
-            #    continue
-
-            # All conditions were met so far. We have a match.
-            # Connect the current track to the new track.
-            new_tracks_to_save.remove(track_to_save)  # The asumption was not correct.
-            tracks.remove(t)  # This will be replaced by the new connected track below.
-            track_to_save.connect(t)  # Connect the two tracks.
-            tracks.append(track_to_save)  # The track will not be saved yet.
-            
-            # The match was found. We assume that this was the best match.
-            # TODO: The next one may actually be better. Or the next one thereafter.
-            break
     return tracks, new_tracks_to_save
 
 def get_bgr_fgmask(fgmask):
@@ -217,42 +187,25 @@ def get_bgr_fgmask(fgmask):
     bgr_fgmask = labelled2bgr(labelled_fgmask)
     return bgr_fgmask
 
-def match_tracks(tracks, trackpoints, track_match_radius):
+def match_trackpoints_with_tracks(trackpoints, tracks, track_match_radius):
     """
     Matches trackpoints with the most suitable track.
     If not tracks to match, a new track is created.
     """
-    if len(trackpoints) > 0:
-        frame = trackpoints[0].frame
-        draw_tracks(tracks, frame)
-
-    while len(trackpoints) > 0:
-        tp = trackpoints.pop()
-
-        tp.draw(frame)
-        tp.draw(frame, radius=track_match_radius, color=(255, 255, 0))
-
-        matched = False
-        closest_tracks = tp.sort_tracks_by_closest(tracks)
-        # Find all the matching tracks.
-        for t in closest_tracks:
-            if t.match(tp, track_match_radius):
-                t.append(t.kalman(tp))
-                matched = True
-                break
-
-        if not matched:
-            # Appended to a new track.
+    for tp in trackpoints:
+        best_matched_track = tp.get_best_match(tracks, track_match_radius)
+        LOG.debug("Best matched track: %s"% best_matched_track)
+        if best_matched_track == None:
+            LOG.debug("Creating new track.")
             t = track.Track()
+            LOG.debug("Adding trackpoint %s"%(tp))
             t.append(tp)
+            LOG.debug("Adding track %s"%(t))
             tracks.append(t)
-
-    if len(trackpoints) > 0:
-        cv2.imshow("frame", frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            sys.exit()
-        time.sleep(1/6.0)
-
+        else:
+            LOG.info("Best matched track age: %s"% best_matched_track.age)
+            LOG.debug("Track was matched.")
+            best_matched_track.append(best_matched_track.kalman(tp))
     return tracks
 
 def prune_tracks(tracks):
@@ -265,6 +218,8 @@ def prune_tracks(tracks):
             # Keep all newly updated tracks.
             tracks_to_keep.append(t)
             continue
+
+        # Age is larger than above.
         if t.total_length() > 10:
             # Keep all old tracks if the length is 
             # long enough. Remove very small tracks.
@@ -308,7 +263,7 @@ def dilate(frame):
     DILATE_KERNEL = np.ones((dilate_kernel_size,)*2, np.uint8)
 
     # Do the dilation.
-    dilated_frame = cv2.morphologyEx(frame, cv2.MORPH_CLOSE, DILATE_KERNEL) #, iterations=1)
+    dilated_frame = cv2.morphologyEx(frame, cv2.MORPH_CLOSE, DILATE_KERNEL, iterations=3)
     return dilated_frame
 
 def foreground_extractor(raw_frames, foreground_frames):

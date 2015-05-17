@@ -50,6 +50,10 @@ def diff_degrees(A, B):
         diff += 360
     return diff
 
+def score_factor(x_min, x_max, x):
+    x = min(max(x, x_min), x_max)
+    return 1-((x-x_min)/(x_max-x_min))
+
 
 class Track:
     def __init__(self):
@@ -92,12 +96,14 @@ class Track:
         self.age = 1
         self.trackpoints.append(trackpoint)
 
-    def connect(self, track):
+    def connect_tracks(self, track):
         """
         Connects two trackpoints.
 
         TODO: Use the parent functionality.
+        self is currently parent.
         """
+        assert(isinstance(track, Track))
         for tp in track.trackpoints:
             self.append(tp)
 
@@ -215,15 +221,59 @@ class Track:
         return trackpoint
 
     def length_to(self, trackpoint):
-        return self.trackpoints[-1].length_to(trackpoint)
+        """
+        Length (number of pixels) from the last trackpoint
+        to the given trackpoint.
+        """
+        assert(isinstance(trackpoint, Trackpoint))
+        return self.last_trackpoint.length_to(trackpoint)
 
     def match(self, trackpoint, track_match_radius, size_match_ratio=0.8):
+        """
+        Check if the trackpoint matches this track.
+        """
+        assert(isinstance(trackpoint, Trackpoint))
         if self.length_to(trackpoint) < track_match_radius:
             #min_size = trackpoint.size * (1-size_match_ratio)
             #max_size = trackpoint.size * (1+size_match_ratio)
             #if min_size < self.avg_size() < max_size:
             return True
         return False
+
+    def match_score(self, trackpoint, track_match_radius):
+        """
+        Calculates a match score for a specific trackpoint.
+        The higher the match score, the better match.
+        """
+        assert(isinstance(trackpoint, Trackpoint))
+        score = 1.0  # Total match.
+        
+        LOG.debug("TP: %s"%trackpoint)
+        distance = self.length_to(trackpoint)
+        if distance > track_match_radius*2.0:
+            LOG.debug("Too far away %f, %f"%(distance, track_match_radius*2.0))
+            score = 0
+            return score
+
+        score *= score_factor(0, track_match_radius*2.0, distance)
+        LOG.debug("Score after dist %f"%score)
+            
+        expected_next_point = self.expected_next_point()
+        if False and expected_next_point != None:
+            expected_direction_deg = self.trackpoints[-1].direction_to(expected_next_point, deg=True)
+            direction_deg = self.trackpoints[-1].direction_to(trackpoint, deg=True)
+            delta_direction = diff_degrees(expected_direction_deg, direction_deg)
+            score *= score_factor(0, 180, abs(delta_direction))
+            LOG.debug("Score after exp. dir: %f"%score)
+
+            distance_to_expected_next_point = trackpoint.length_to(expected_next_point)
+            score *= score_factor(0, track_match_radius, distance_to_expected_next_point)
+            LOG.debug("Score after exp. dist: %f"%score)
+        else:
+            score *= score
+            LOG.debug("Score squared: %f"%score)
+
+        return score
 
     def draw_lines(self, frame, color=(255, 0, 255), thickness=1):
         """
@@ -253,6 +303,24 @@ class Track:
             return "Bike"
         else:
             return "Car"
+    
+    @property
+    def first_trackpoint(self):
+        """
+        Gets the starting point of the tracks.
+        """
+        if len(self.trackpoints) == 0:
+            return None
+        return self.trackpoints[0]
+
+    @property
+    def last_trackpoint(self):
+        """
+        Gets the starting point of the tracks.
+        """
+        if len(self.trackpoints) == 0:
+            return None
+        return self.trackpoints[-1]
 
     def save(self, min_linear_length, track_match_radius,
              trackpoints_save_directory=None):
