@@ -142,17 +142,17 @@ if __name__ == "__main__":
     dilater.start()
     LOG.info("Dilater started.")
 
-    # The counter creates tracks from the frames.
+    # The tracker creates tracks from the frames.
     # When a full track is created, it is inserted into
     # the tracks_to_save_queue.
-    counter_process = multiprocessing.Process(
-        target=objecttracker.counter,
+    tracker_process = multiprocessing.Process(
+        target=objecttracker.tracker,
         # args=(dilated_frames, temp_queue, track_match_radius)
         args=(dilated_frames, tracks_to_save, track_match_radius)
         )
-    counter_process.daemon = True
-    counter_process.start()
-    LOG.info("Counter process started.")
+    tracker_process.daemon = True
+    tracker_process.start()
+    LOG.info("Tracker process started.")
 
     # The track saver saves the tracks that needs to be saved.
     # It also puts the data into the database.
@@ -199,7 +199,5 @@ dilated frames: %i, frames to save: %i.""" % (
                 """
     # Wait for all processes to end, which should never happen.
     frame_reader.join()
-    # counter_process.join()
-    # track_saver.join()
 
     print "FIN"

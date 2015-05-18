@@ -337,13 +337,13 @@ def dilater(input_frames, output_frames):
         output_frames.put([dilated_fgmask, raw_frame, timestamp])
 
 
-def counter(input_frames, output_tracks, track_match_radius):
+def tracker(input_frames, output_tracks, track_match_radius):
     tracks = []
     while True:
-        LOG.debug("Track counter: Waiting for a frame.")
+        LOG.debug("Tracker: Waiting for a frame.")
         fgmask, raw_frame, timestamp = input_frames.get(block=True)
 
-        LOG.debug("Track counter: Got a fgmask. Number in queue: %i." %
+        LOG.debug("Tracker: Got a fgmask. Number in queue: %i." %
                   input_frames.qsize())
         tracks, tracks_to_save = get_tracks_to_save(fgmask,
                                                     raw_frame,
@@ -357,11 +357,17 @@ def counter(input_frames, output_tracks, track_match_radius):
 
 
 def track_saver(input_queue, min_linear_length, track_match_radius,
-                trackpoints_save_directory):
+                trackpoints_save_directory, save_tracks_to_disk=False):
+    """
+    Process responsible for saving the track to the database and disk.
+    """
     while True:
         LOG.debug("Tracksaver: Waiting for a track to save.")
         track_to_save = input_queue.get(block=True)
         LOG.debug("Tracksaver: Got a track to save. Number of tracks to \
 save in queue: %i." % input_queue.qsize())
-        track_to_save.save(min_linear_length, track_match_radius,
-                           trackpoints_save_directory)
+        track.save_to_db()
+        LOG.info(track)
+        if save_tracks_to_disk:
+            track_to_save.save_to_disk(min_linear_length, track_match_radius,
+                                       trackpoints_save_directory)

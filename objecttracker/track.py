@@ -56,6 +56,10 @@ def score_factor(x_min, x_max, x):
     return 1 - ((x - x_min) / (x_max - x_min))
 
 
+class TrackException(Exception):
+    pass
+
+
 class Track:
     def __init__(self):
         self.parent = None
@@ -335,20 +339,37 @@ between trackpoints: '%f'." % (self.total_length(),
             return None
         return self.trackpoints[-1]
 
-    def save(self, min_linear_length, track_match_radius,
+    def save_to_disk(self, min_linear_length, track_match_radius,
              trackpoints_save_directory=None):
         """
         Saves the trackpoints to a file, including the parent track.
         """
         LOG.debug("Saving track.")
+        if trackpoints_save_directory is None:
+            raise TrackException("Trackpoint save directory is not set.")
+
+        if not os.path.isdir(trackpoints_save_directory):
+            raise TrackException("Trackpoint save directory '%s' does not \
+exist." % trackpoints_save_directory)
+
         if self.linear_length() < min_linear_length:
             LOG.debug("Too short track.")
-            if trackpoints_save_directory is not None:
-                self.save_trackpoints_to_directory(trackpoints_save_directory,
-                                                   "short", track_match_radius)
-            return
+            name = "short"
+        else:
+            name = "OK"
 
-        date_str = datetime.datetime.now().isoformat()
+        # Saving the tracks to disk.
+        self.save_trackpoints_to_directory(trackpoints_save_directory,
+                                           name, track_match_radius)
+
+    def save_to_db(self):
+        """
+        Saves the track features to the db.
+        """
+        # Date set to middle time stamp.
+        date_str = (self.trackpoints[0].timestamp +
+                    (self.trackpoints[-1].timestamp -
+                     self.trackpoints[0].timestamp) / 2).isoformat()
         key_values = {
             "date": date_str,
             "avg_size": "%.3f" % self.avg_size(),
@@ -370,12 +391,9 @@ between trackpoints: '%f'." % (self.total_length(),
         LOG.debug("Values: '%s'." % ("', '".join(key_values.values())))
 
         with database.Db() as db:
-            LOG.debug("Saving track.")
+            LOG.debug("Saving track to db.")
             db.execute(sql, values)
 
-        if trackpoints_save_directory is not None:
-            self.save_trackpoints_to_directory(
-                trackpoints_save_directory, "OK", track_match_radius)
         LOG.info("Track saved.")
 
     def save_trackpoints_to_directory(self,

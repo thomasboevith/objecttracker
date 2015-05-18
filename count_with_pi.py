@@ -27,6 +27,8 @@ Options:
                                     images / second. [default: 14].
     --record-frames-path=<path>     Where to save the frames.
                                     [default: /data/frames].
+    --save-tracks                   Save the tracks to disk. Set the path
+                                    by --tracks-save-path
     --tracks-save-path=<path>       Where to save the tracks,
                                     [default: /data/tracks].
 """.format(filename=os.path.basename(__file__))
@@ -130,9 +132,6 @@ if __name__ == "__main__":
         track_match_radius = 2 * min_linear_length / int(args['--frame-rate'])
     LOG.info("Track match radius: %i" % (track_match_radius))
 
-    # Where the tracks are saved.
-    trackpoints_save_directory = args["--tracks-save-path"]
-
     raw_frames = multiprocessing.Queue()
     foreground_frames = multiprocessing.Queue()
     eroded_frames = multiprocessing.Queue()
@@ -182,17 +181,17 @@ if __name__ == "__main__":
         dilater.start()
         LOG.info("Dilater started.")
 
-        # The counter creates tracks from the frames.
+        # The tracker creates tracks from the frames.
         # When a full track is created, it is inserted into
         # the tracks_to_save_queue.
-        counter_process = multiprocessing.Process(
-            target=objecttracker.counter,
+        tracker_process = multiprocessing.Process(
+            target=objecttracker.tracker,
             # args=(dilated_frames, temp_queue, track_match_radius)
             args=(dilated_frames, tracks_to_save, track_match_radius)
             )
-        counter_process.daemon = True
-        counter_process.start()
-        LOG.info("Counter process started.")
+        tracker_process.daemon = True
+        tracker_process.start()
+        LOG.info("Tracker process started.")
 
         # The track saver saves the tracks that needs to be saved.
         # It also puts the data into the database.
@@ -202,7 +201,8 @@ if __name__ == "__main__":
                 tracks_to_save,
                 min_linear_length,
                 track_match_radius,
-                trackpoints_save_directory))
+                args["--tracks-save-path"],
+                args["--save-tracks"]))
         track_saver.daemon = True
         track_saver.start()
         LOG.info("Track saver started.")
