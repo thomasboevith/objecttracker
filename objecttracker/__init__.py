@@ -293,7 +293,7 @@ def dilate(frame):
     return dilated_frame
 
 
-def foreground_extractor(raw_frames, foreground_frames):
+def foreground_extractor(raw_frames, foreground_frames, save_raw_frame=False):
     """
     Extracts the foreground (fgmask) from the raw frame and
     puts the foreground into the buffer.
@@ -307,6 +307,10 @@ def foreground_extractor(raw_frames, foreground_frames):
 
         # Get the foreground.
         fgmask = get_foreground(fgbg, raw_frame)
+
+        # Only save the raw frame if it is necassary.
+        if not save_raw_frame:
+            raw_frame = None
 
         # Insert the frame and the timestamp into the buffer.
         foreground_frames.put([fgmask, raw_frame, timestamp])
@@ -366,8 +370,8 @@ def track_saver(input_queue, min_linear_length, track_match_radius,
         track_to_save = input_queue.get(block=True)
         LOG.debug("Tracksaver: Got a track to save. Number of tracks to \
 save in queue: %i." % input_queue.qsize())
-        track.save_to_db()
-        LOG.info(track)
+        track_to_save.save_to_db()
+        LOG.info(track_to_save)
         if save_tracks_to_disk:
             track_to_save.save_to_disk(min_linear_length, track_match_radius,
                                        trackpoints_save_directory)

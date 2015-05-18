@@ -24,13 +24,14 @@ Options:
                                     If not set, default value is calculated
                                     from frame size and framerate.
     --frame-rate=<framerate>        The camera frame rate. I.e. number of
-                                    images / second. [default: 14].
+                                    images / second. [default: 12].
     --record-frames-path=<path>     Where to save the frames.
                                     [default: /data/frames].
     --save-tracks                   Save the tracks to disk. Set the path
                                     by --tracks-save-path
     --tracks-save-path=<path>       Where to save the tracks,
                                     [default: /data/tracks].
+    --automatic-white-ballance      Automatically set white ballance.
 """.format(filename=os.path.basename(__file__))
 
 import time
@@ -60,7 +61,8 @@ else:
 LOG.debug(args)
 
 
-def get_frames(frames_queue, resolution, framerate):
+def get_frames(frames_queue, resolution, framerate,
+               automatic_white_ballance=False):
     camera = PiCamera()
     camera.resolution = resolution
     camera.framerate = framerate  # 16 #30
@@ -72,17 +74,18 @@ def get_frames(frames_queue, resolution, framerate):
     LOG.info("Warming up camera. Sleeping for %i seconds." % (sleeptime_s))
     time.sleep(sleeptime_s)
 
-    camera.shutter_speed = 2980  # = camera.exposure_speed
-    # camera.shutter_speed  at midnight: 0
-    camera.exposure_mode = 'off'
-    LOG.info("Camera shutter speed: %i" % camera.shutter_speed)
+    if not automatic_white_ballance:
+        camera.shutter_speed = 2980  # = camera.exposure_speed
+        # camera.shutter_speed  at midnight: 0
+        camera.exposure_mode = 'off'
+        LOG.info("Camera shutter speed: %i" % camera.shutter_speed)
 
-    camera.awb_mode = 'off'
-    LOG.info("Camera auto white ballance: %s" % (camera.awb_mode))
+        camera.awb_mode = 'off'
+        LOG.info("Camera auto white ballance: %s" % (camera.awb_mode))
 
-    camera.awb_gains = (1.4, 1.2)
-    # Camera awb_gains at midnight: (77/64, 191/128)
-    LOG.info("Auto white ballance gains: (%s, %s)" % (camera.awb_gains))
+        camera.awb_gains = (1.4, 1.2)
+        # Camera awb_gains at midnight: (77/64, 191/128)
+        LOG.info("Auto white ballance gains: (%s, %s)" % (camera.awb_gains))
 
     LOG.info("Camera ready.")
     rawCapture = PiRGBArray(camera, size=camera.resolution)
@@ -121,9 +124,6 @@ if __name__ == "__main__":
                             level=logging.WARNING)
     LOG.info(args)
 
-    # args['--record-frames-only']
-    # args['--save-tracks']
-    # args['--record-frames']
     resolution = (640 / 2, 480 / 2)
     min_linear_length = max(resolution) / 2
     if args['--track-match-radius'] is not None:
@@ -131,6 +131,9 @@ if __name__ == "__main__":
     else:
         track_match_radius = 2 * min_linear_length / int(args['--frame-rate'])
     LOG.info("Track match radius: %i" % (track_match_radius))
+
+    if not args["--save-tracks"]:
+        LOG.info("Tracks will not be saved... Use --save-tracks to save tracks.")
 
     raw_frames = multiprocessing.Queue()
     foreground_frames = multiprocessing.Queue()
@@ -141,7 +144,8 @@ if __name__ == "__main__":
     # The frame reader puts the frames into the frames queue.
     frame_reader = multiprocessing.Process(
         target=get_frames,
-        args=(raw_frames, resolution, int(args['--frame-rate'])))
+        args=(raw_frames, resolution, int(args['--frame-rate']),
+              args['--automatic-white-ballance']))
     frame_reader.daemon = True
     frame_reader.start()
     LOG.info("Frames reader started.")
@@ -156,7 +160,7 @@ if __name__ == "__main__":
         # separate the foreground from the background.
         foreground_extractor = multiprocessing.Process(
             target=objecttracker.foreground_extractor,
-            args=(raw_frames, foreground_frames)
+            args=(raw_frames, foreground_frames, args["--save-tracks"])
             )
         foreground_extractor.daemon = True
         foreground_extractor.start()
@@ -209,7 +213,7 @@ if __name__ == "__main__":
 
         d = datetime.datetime.now()
         while True:
-            if (datetime.datetime.now() - d).total_seconds() > 100:
+            if (datetime.datetime.now() - d).total_seconds() > 90:
                 d = datetime.datetime.now()
                 print """Raw frames: %i, foreground frames: %i, eroded \
 frames: %i, dilated frames: %i, frames to save: %i.""" % (

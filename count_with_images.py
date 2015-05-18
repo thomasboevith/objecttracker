@@ -5,14 +5,16 @@ __doc__ = """Usage:
     {filename} [options] <image_directory> [--verbose|--debug]
 
 Options:
-    -h, --help                        This help message.
-    -d, --debug                       Output a lot of info..
-    -v, --verbose                     Output less less info.
-    --log-filename=logfilename        Name of the log file.
-    --frames-path=<path>              Where to find the frames,
-                                      [default: /tmp/frames].
-    --tracks-save-path=<path>         Where to save the tracks,
-                                      [default: /data/tracks].
+    -h, --help                      This help message.
+    -d, --debug                     Output a lot of info..
+    -v, --verbose                   Output less less info.
+    --log-filename=logfilename      Name of the log file.
+    --frames-path=<path>            Where to find the frames,
+                                    [default: /tmp/frames].
+    --save-tracks                   Save the tracks to disk. Set the path
+                                    by --tracks-save-path
+    --tracks-save-path=<path>       Where to save the tracks,
+                                    [default: /data/tracks].
 """.format(filename=os.path.basename(__file__))
 
 import cv2
@@ -86,9 +88,6 @@ if __name__ == "__main__":
     track_match_radius = min_linear_length / 10
     print track_match_radius
 
-    # Where the tracks are saved.
-    trackpoints_save_directory = args["--tracks-save-path"]
-
     # The frames queue is a list queue with list items.
     # Each item is a list with a timestamp and an image:
     # E.g. [<timestamp>, <image>]
@@ -117,7 +116,7 @@ if __name__ == "__main__":
     # separate the foreground from the background.
     foreground_extractor = multiprocessing.Process(
         target=objecttracker.foreground_extractor,
-        args=(raw_frames, foreground_frames)
+        args=(raw_frames, foreground_frames, args["--save-tracks"])
         )
     foreground_extractor.daemon = True
     foreground_extractor.start()
@@ -162,7 +161,8 @@ if __name__ == "__main__":
             tracks_to_save,
             min_linear_length,
             track_match_radius,
-            trackpoints_save_directory))
+            args["--tracks-save-path"],
+            args["--save-tracks"]))
     track_saver.daemon = True
     track_saver.start()
     LOG.info("Track saver started.")

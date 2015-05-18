@@ -208,7 +208,6 @@ between trackpoints: '%f'." % (self.total_length(),
             last_tp.timestamp + (last_tp.timestamp - second_last_tp.timestamp),
             (2 * last_tp.x - second_last_tp.x),
             (2 * last_tp.y - second_last_tp.y),
-            None,
             )
         return expected_next_point
 
@@ -354,7 +353,7 @@ exist." % trackpoints_save_directory)
 
         if self.linear_length() < min_linear_length:
             LOG.debug("Too short track.")
-            name = "short"
+            name = "SHORT"
         else:
             name = "OK"
 
