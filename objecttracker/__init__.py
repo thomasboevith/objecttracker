@@ -12,6 +12,7 @@ import logging
 # Define the logger
 LOG = logging.getLogger(__name__)
 
+
 def labelled2bgr(labelled_fgmask):
     """
     Assigns a colour to each a labeled connected component in the
@@ -35,21 +36,25 @@ def labelled2bgr(labelled_fgmask):
     colour in the rgb mask.
     """
     # Create an empty bgr mask.
-    bgr_mask = np.zeros((labelled_fgmask.shape[0], labelled_fgmask.shape[1], 3), dtype=np.uint8)
+    bgr_mask = np.zeros(
+        (labelled_fgmask.shape[0], labelled_fgmask.shape[1], 3),
+        dtype=np.uint8)
 
     # Determine the number of connected components / labels.
     # The labels are assigned with the next number (i+=1), starting with 1,
     # so the number of labels is the highest (max) label.
     number_of_connected_components = np.max(labelled_fgmask)
 
-    # If there are no objects in the labelled mask. Just return the empty bgr mask.
+    # If there are no objects in the labelled mask. Just return the empty
+    # bgr mask.
     if number_of_connected_components > 0:
         # Get an array of colors.
         colors = color.get_colors(number_of_connected_components)
 
         # Assign each colour to a label.
         for object_id in np.arange(np.max(labelled_fgmask)):
-            bgr_mask[np.where(labelled_fgmask == object_id + 1)] = colors[object_id]
+            bgr_mask[np.where(labelled_fgmask == object_id + 1)] = \
+                colors[object_id]
 
     # Return the backgound mask with its new, beautiful colours.
     return bgr_mask
@@ -73,13 +78,14 @@ def get_bounding_box(contour):
     """
     return cv2.boundingRect(contour)
 
+
 def get_trackpoints(fgmask, raw_frame, timestamp):
     """
     Gets the trackpoints from the foreground mask.
     """
     # The area must have a certain size.
-    min_object_area = min(fgmask.shape[0], fgmask.shape[1])/4
-    LOG.debug("Min object area: %i"%(min_object_area))
+    min_object_area = min(fgmask.shape[0], fgmask.shape[1]) / 4
+    LOG.debug("Min object area: %i" % (min_object_area))
 
     # Collect the trackpoints.
     trackpoints = []
@@ -89,8 +95,11 @@ def get_trackpoints(fgmask, raw_frame, timestamp):
         # Only use contours of a certain size.
         if contour_area > min_object_area:
             cx, cy = get_centroid(cnt)
-            trackpoints.append(trackpoint.Trackpoint(timestamp, cx, cy, raw_frame, size=contour_area))
+            trackpoints.append(
+                trackpoint.Trackpoint(timestamp, cx, cy,
+                                      raw_frame, size=contour_area))
     return trackpoints
+
 
 def get_foreground(foreground_background_subtractor,
                    raw_frame,
@@ -99,7 +108,7 @@ def get_foreground(foreground_background_subtractor,
     resolution = raw_frame.shape[0:2]
 
     # Blur the frame a little.
-    blurred_frame = cv2.blur(raw_frame, (int(max(resolution)/50.0), )*2)
+    blurred_frame = cv2.blur(raw_frame, (int(max(resolution) / 50.0), ) * 2)
 
     # Subtract the foreground from the background.
     fgmask = foreground_background_subtractor.apply(blurred_frame,
@@ -108,13 +117,17 @@ def get_foreground(foreground_background_subtractor,
     # Remove the smallest noise and holes in objects.
     return fgmask
 
-def get_tracks_to_save(fgmask, raw_frame, timestamp, tracks, track_match_radius):
-    # Get all trackpoints from the fgmask. 
+
+def get_tracks_to_save(fgmask, raw_frame, timestamp, tracks,
+                       track_match_radius):
+    # Get all trackpoints from the fgmask.
     trackpoints = get_trackpoints(fgmask, raw_frame, timestamp)
 
     # Match the tracks with the trackpoints.
-    tracks, tracks_to_save = separate_tracks(trackpoints, tracks, track_match_radius) 
+    tracks, tracks_to_save = separate_tracks(trackpoints, tracks,
+                                             track_match_radius)
     return tracks, tracks_to_save
+
 
 def separate_tracks(trackpoints, tracks, track_match_radius):
     """
@@ -122,18 +135,20 @@ def separate_tracks(trackpoints, tracks, track_match_radius):
     tracks (the ones to keep adding to).
     """
     LOG.debug("Separating tracks.")
- 
+
     # LOG.info("Tracks: %i %i"%(len(tracks), len(trackpoints)))
     # print tracks
-    LOG.debug("Inden: Tracks: %i %i"%(len(tracks), len(trackpoints)))
-    tracks = match_trackpoints_with_tracks(trackpoints, tracks, track_match_radius)
-    LOG.debug("Efter: tracks: %i %i"%(len(tracks), len(trackpoints)))
+    LOG.debug("Inden: Tracks: %i %i" % (len(tracks), len(trackpoints)))
+    tracks = match_trackpoints_with_tracks(trackpoints, tracks,
+                                           track_match_radius)
+    LOG.debug("Efter: tracks: %i %i" % (len(tracks), len(trackpoints)))
 
-    for t in tracks: t.incr_age()
-        
+    for t in tracks:
+        t.incr_age()
+
     # Remove old tracks that are smaller than the diameter of the
     # match circle.
-    tracks = prune_tracks(tracks, track_match_radius*2)
+    tracks = prune_tracks(tracks, track_match_radius * 2)
 
     # Split old and new tracks.
     tracks_to_save = []
@@ -146,8 +161,10 @@ def separate_tracks(trackpoints, tracks, track_match_radius):
 
     # Connect possible small tracks.
     tracks = new_tracks
-    tracks, tracks_to_save = connect_tracks(tracks, tracks_to_save, track_match_radius)
+    tracks, tracks_to_save = connect_tracks(tracks, tracks_to_save,
+                                            track_match_radius)
     return tracks, tracks_to_save
+
 
 def connect_tracks(tracks, tracks_to_save, track_match_radius):
     """
@@ -165,12 +182,13 @@ def connect_tracks(tracks, tracks_to_save, track_match_radius):
         max_score = 0
 
         for match_track in tracks:
-            score = track_to_save.match_score(match_track.first_trackpoint, track_match_radius*3)
+            score = track_to_save.match_score(match_track.first_trackpoint,
+                                              track_match_radius * 3)
             if score > max_score:
                 matched_track = match_track
                 max_score = score
 
-        if matched_track != None and max_score > 0.3:
+        if matched_track is not None and max_score > 0.3:
             tracks.remove(matched_track)
             tracks.append(track_to_save)
             track_to_save.connect_tracks(matched_track)
@@ -178,6 +196,7 @@ def connect_tracks(tracks, tracks_to_save, track_match_radius):
             new_tracks_to_save.append(track_to_save)
 
     return tracks, new_tracks_to_save
+
 
 def get_bgr_fgmask(fgmask):
     """
@@ -188,6 +207,7 @@ def get_bgr_fgmask(fgmask):
     bgr_fgmask = labelled2bgr(labelled_fgmask)
     return bgr_fgmask
 
+
 def match_trackpoints_with_tracks(trackpoints, tracks, track_match_radius):
     """
     Matches trackpoints with the most suitable track.
@@ -195,19 +215,20 @@ def match_trackpoints_with_tracks(trackpoints, tracks, track_match_radius):
     """
     for tp in trackpoints:
         best_matched_track = tp.get_best_match(tracks, track_match_radius)
-        LOG.debug("Best matched track: %s"% best_matched_track)
-        if best_matched_track == None:
+        LOG.debug("Best matched track: %s" % best_matched_track)
+        if best_matched_track is None:
             LOG.debug("Creating new track.")
             t = track.Track()
-            LOG.debug("Adding trackpoint %s"%(tp))
+            LOG.debug("Adding trackpoint %s" % (tp))
             t.append(tp)
-            LOG.debug("Adding track %s"%(t))
+            LOG.debug("Adding track %s" % (t))
             tracks.append(t)
         else:
-            LOG.debug("Best matched track age: %s"% best_matched_track.age)
+            LOG.debug("Best matched track age: %s" % best_matched_track.age)
             LOG.debug("Track was matched.")
             best_matched_track.append(best_matched_track.kalman(tp))
     return tracks
+
 
 def prune_tracks(tracks, min_track_length):
     """
@@ -222,11 +243,12 @@ def prune_tracks(tracks, min_track_length):
 
         # Age is larger than above.
         if t.total_length() > min_track_length:
-            # Keep all old tracks if the length is 
+            # Keep all old tracks if the length is
             # long enough. Remove very small tracks.
             tracks_to_keep.append(t)
             continue
     return tracks_to_keep
+
 
 def draw_tracks(tracks, frame):
     """
@@ -246,13 +268,15 @@ def erode(frame):
     """
     # Setting the kernel.
     LOG.debug("Eroding (making the black bigger).")
-    erode_kernel_size = max(frame.shape[:2])/50
-    LOG.debug("Erode kernel size: '%s'."%(erode_kernel_size))
-    ERODE_KERNEL = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (erode_kernel_size,)*2)
+    erode_kernel_size = max(frame.shape[:2]) / 50
+    LOG.debug("Erode kernel size: '%s'." % (erode_kernel_size))
+    ERODE_KERNEL = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,
+                                             (erode_kernel_size,) * 2)
 
     # Do the erotion.
     eroded_frame = cv2.morphologyEx(frame, cv2.MORPH_OPEN, ERODE_KERNEL)
     return eroded_frame
+
 
 def dilate(frame):
     """
@@ -260,12 +284,14 @@ def dilate(frame):
     """
     # Setting the dilation kernel.
     LOG.debug("Dilating (making it smaller again).")
-    dilate_kernel_size = min(frame.shape[:2])/50
-    DILATE_KERNEL = np.ones((dilate_kernel_size,)*2, np.uint8)
+    dilate_kernel_size = min(frame.shape[:2]) / 50
+    DILATE_KERNEL = np.ones((dilate_kernel_size,) * 2, np.uint8)
 
     # Do the dilation.
-    dilated_frame = cv2.morphologyEx(frame, cv2.MORPH_CLOSE, DILATE_KERNEL, iterations=3)
+    dilated_frame = cv2.morphologyEx(frame, cv2.MORPH_CLOSE, DILATE_KERNEL,
+                                     iterations=3)
     return dilated_frame
+
 
 def foreground_extractor(raw_frames, foreground_frames):
     """
@@ -276,7 +302,8 @@ def foreground_extractor(raw_frames, foreground_frames):
     while True:
         LOG.debug("Foreground extractor: Waiting for a raw frame.")
         raw_frame, timestamp = raw_frames.get(block=True)
-        LOG.debug("Foreground extractor: Got a frame. Number in queue: %i."%raw_frames.qsize())
+        LOG.debug("Foreground extractor: Got a frame. Number in queue: %i." %
+                  raw_frames.qsize())
 
         # Get the foreground.
         fgmask = get_foreground(fgbg, raw_frame)
@@ -284,13 +311,16 @@ def foreground_extractor(raw_frames, foreground_frames):
         # Insert the frame and the timestamp into the buffer.
         foreground_frames.put([fgmask, raw_frame, timestamp])
 
+
 def eroder(input_frames, output_frames):
     while True:
         LOG.debug("Eroder: Waiting for a frame.")
         fgmask, raw_frame, timestamp = input_frames.get(block=True)
-        LOG.debug("Eroder: Got a input frame. Number in queue: %i."%input_frames.qsize())
+        LOG.debug("Eroder: Got a input frame. Number in queue: %i." %
+                  input_frames.qsize())
         eroded_fgmask = erode(fgmask)
         output_frames.put([eroded_fgmask, raw_frame, timestamp])
+
 
 def dilater(input_frames, output_frames):
     """
@@ -301,9 +331,11 @@ def dilater(input_frames, output_frames):
         LOG.debug("Dilater: Waiting for a eroded frame.")
         fgmask, raw_frame, timestamp = input_frames.get(block=True)
 
-        LOG.debug("Dilater: Got a frame. Number in queue: %i."%input_frames.qsize())
+        LOG.debug("Dilater: Got a frame. Number in queue: %i." %
+                  input_frames.qsize())
         dilated_fgmask = dilate(fgmask)
         output_frames.put([dilated_fgmask, raw_frame, timestamp])
+
 
 def counter(input_frames, output_tracks, track_match_radius):
     tracks = []
@@ -311,17 +343,25 @@ def counter(input_frames, output_tracks, track_match_radius):
         LOG.debug("Track counter: Waiting for a frame.")
         fgmask, raw_frame, timestamp = input_frames.get(block=True)
 
-        LOG.debug("Track counter: Got a fgmask. Number in queue: %i." % input_frames.qsize())
-        tracks, tracks_to_save = get_tracks_to_save(fgmask, raw_frame, timestamp, tracks, track_match_radius)
+        LOG.debug("Track counter: Got a fgmask. Number in queue: %i." %
+                  input_frames.qsize())
+        tracks, tracks_to_save = get_tracks_to_save(fgmask,
+                                                    raw_frame,
+                                                    timestamp,
+                                                    tracks,
+                                                    track_match_radius)
 
         for t in tracks_to_save:
             # Putting tracks to save in the save queue.
             output_tracks.put(t)
 
-def track_saver(input_queue, min_linear_length, track_match_radius, trackpoints_save_directory):
+
+def track_saver(input_queue, min_linear_length, track_match_radius,
+                trackpoints_save_directory):
     while True:
         LOG.debug("Tracksaver: Waiting for a track to save.")
         track_to_save = input_queue.get(block=True)
-        LOG.debug("Tracksaver: Got a track to save. Number of tracks to save in queue: %i."%input_queue.qsize())
-        track_to_save.save(min_linear_length, track_match_radius, trackpoints_save_directory)
-        
+        LOG.debug("Tracksaver: Got a track to save. Number of tracks to \
+save in queue: %i." % input_queue.qsize())
+        track_to_save.save(min_linear_length, track_match_radius,
+                           trackpoints_save_directory)

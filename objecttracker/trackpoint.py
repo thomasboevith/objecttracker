@@ -8,7 +8,7 @@ LOG = logging.getLogger(__name__)
 
 
 class Trackpoint:
-    def __init__(self, timestamp, x, y, frame, size=None, color=None):
+    def __init__(self, timestamp, x, y, frame=None, size=None, color=None):
         """
         A trackpoint is the centroid of the object.
         Each trackpoint is assigned to a tracks.
@@ -33,7 +33,8 @@ class Trackpoint:
         """
         Creates a new trackpoint with the same values.
         """
-        return Trackpoint(self.timestamp, self.x, self.y, self.frame, self.size, self.color)
+        return Trackpoint(self.timestamp, self.x, self.y,
+                          self.frame, self.size, self.color)
 
     def length_to(self, tp):
         """
@@ -56,7 +57,7 @@ class Trackpoint:
         """
         assert(isinstance(tp, Trackpoint))
         # archtan(x/y)
-        direction = np.arctan2((tp.x - self.x), (tp.y-self.y))
+        direction = np.arctan2((tp.x - self.x), (tp.y - self.y))
         if deg:
             direction = np.rad2deg(direction)
         return direction
@@ -79,6 +80,9 @@ class Trackpoint:
                 best_match_score = match_score
                 best_match_track = t
 
-        LOG.debug("Best match score: %f. Returning track: %s."%(best_match_score, best_match_track))
-        if best_match_track != None: LOG.debug("RETURNING track age: %s"%best_match_track.age)
+        LOG.debug("Best match score: %f. Returning track: %s." % (
+                best_match_score,
+                best_match_track))
+        if best_match_track is not None:
+            LOG.debug("RETURNING track age: %s" % best_match_track.age)
         return best_match_track

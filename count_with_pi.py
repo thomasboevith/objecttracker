@@ -10,17 +10,21 @@ Options:
     -v, --verbose                   Output less less info.
     --log-filename=logfilename      Name of the log file.
     --record-frames-only            Only save the frames.
-    --track-match-radius=<radius>   Track match radius. When a trackpoint is found, the matching track
-                                    must be within this radius from the last point in a track, to match
-                                    the track.
+    --track-match-radius=<radius>   Track match radius. When a trackpoint is
+                                    found, the matching track must be within
+                                    this radius from the last point in a track,
+                                    to match the track.
                                                           ___
-                                                         /   \ 
-                                      o---o----o---o----(--o  ) The new trackpoint must be within the track radius.
-                                                         \___/ 
+                                                         /   \\
+                                      o---o----o---o----(--o  ) The new
+                                                         \___/ trackpoint
+                                                              must be within
+                                                            the track radius.
 
-                                    If not set, default value is calculated from frame size and framerate.
-    --frame-rate=<framerate>        The camera frame rate. I.e. number of images / second.
-                                    [default: 14].
+                                    If not set, default value is calculated
+                                    from frame size and framerate.
+    --frame-rate=<framerate>        The camera frame rate. I.e. number of
+                                    images / second. [default: 14].
     --record-frames-path=<path>     Where to save the frames.
                                     [default: /data/frames].
     --tracks-save-path=<path>       Where to save the tracks,
@@ -57,7 +61,7 @@ LOG.debug(args)
 def get_frames(frames_queue, resolution, framerate):
     camera = PiCamera()
     camera.resolution = resolution
-    camera.framerate = framerate # 16 #30
+    camera.framerate = framerate  # 16 #30
     # camera.iso = 800
     camera.zoom = (0.1, 0.2, 0.9, 0.9)
 
@@ -69,14 +73,14 @@ def get_frames(frames_queue, resolution, framerate):
     camera.shutter_speed = 2980  # = camera.exposure_speed
     # camera.shutter_speed  at midnight: 0
     camera.exposure_mode = 'off'
-    LOG.info("Camera shutter speed: %i"%camera.shutter_speed)
+    LOG.info("Camera shutter speed: %i" % camera.shutter_speed)
 
     camera.awb_mode = 'off'
-    LOG.info("Camera auto white ballance: %s"%(camera.awb_mode))
+    LOG.info("Camera auto white ballance: %s" % (camera.awb_mode))
 
     camera.awb_gains = (1.4, 1.2)
     # Camera awb_gains at midnight: (77/64, 191/128)
-    LOG.info("Auto white ballance gains: (%s, %s)"%(camera.awb_gains))
+    LOG.info("Auto white ballance gains: (%s, %s)" % (camera.awb_gains))
 
     LOG.info("Camera ready.")
     rawCapture = PiRGBArray(camera, size=camera.resolution)
@@ -89,13 +93,15 @@ def get_frames(frames_queue, resolution, framerate):
         # It should change very slowly.
         rawCapture.truncate(0)
 
+
 def save_frames(frames_queue, save_path):
     while True:
         stamp, frame = frames_queue.get(block=True)
         directory = os.path.join(savepath, stamp.strftime("%Y%m%dT%H"))
         if not os.path.isdir(directory):
             os.makedirs(directory)
-        cv2.imwrite(os.path.join(directory, "%s.png" % stamp.isoformat()), frame)
+        cv2.imwrite(os.path.join(directory, "%s.png" % stamp.isoformat()),
+                    frame)
 
 
 if __name__ == "__main__":
@@ -116,13 +122,13 @@ if __name__ == "__main__":
     # args['--record-frames-only']
     # args['--save-tracks']
     # args['--record-frames']
-    resolution = (640/2, 480/2)
+    resolution = (640 / 2, 480 / 2)
     min_linear_length = max(resolution) / 2
-    if args['--track-match-radius'] != None:
+    if args['--track-match-radius'] is not None:
         track_match_radius = int(args['--track-match-radius'])
     else:
         track_match_radius = 2 * min_linear_length / int(args['--frame-rate'])
-    LOG.info("Track match radius: %i"%(track_match_radius))
+    LOG.info("Track match radius: %i" % (track_match_radius))
 
     # Where the tracks are saved.
     trackpoints_save_directory = args["--tracks-save-path"]
@@ -142,10 +148,8 @@ if __name__ == "__main__":
     LOG.info("Frames reader started.")
 
     if args['--record-frames-only']:
-        frame_saver = multiprocessing.Process(
-            target = save_frames,
-            args=(raw_frames, args['--record-frames-path'])
-            )
+        frame_saver = multiprocessing.Process(target=save_frames,
+            args=(raw_frames, args['--record-frames-path']))
         frame_saver.daemon = True
         frame_saver.start()
     else:
@@ -167,7 +171,6 @@ if __name__ == "__main__":
         eroder.daemon = True
         eroder.start()
         LOG.info("Eroder started.")
-    
 
         # The dilate process dilates the foreground frame. This is done
         # after the erode process so that the frame is eroded and dilated.
@@ -208,8 +211,8 @@ if __name__ == "__main__":
         while True:
             if (datetime.datetime.now() - d).total_seconds() > 100:
                 d = datetime.datetime.now()
-                print """Raw frames: %i, foreground frames: %i, eroded frames: %i,
-dilated frames: %i, frames to save: %i.""" % (
+                print """Raw frames: %i, foreground frames: %i, eroded \
+frames: %i, dilated frames: %i, frames to save: %i.""" % (
                     raw_frames.qsize(),
                     foreground_frames.qsize(),
                     eroded_frames.qsize(),

@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
-
 import logging
+
 LOG = logging.getLogger(__name__)
 
 
@@ -34,4 +34,3 @@ def create_labelled_frame(fgmask):
     contours = find_contours(fgmask)
     LOG.debug("%i connected components." % (np.max(fgmask)))
     return label_frame(contours, fgmask)
-

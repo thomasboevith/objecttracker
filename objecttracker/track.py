@@ -50,9 +50,10 @@ def diff_degrees(A, B):
         diff += 360
     return diff
 
+
 def score_factor(x_min, x_max, x):
     x = min(max(x, x_min), x_max)
-    return 1-((x-x_min)/(x_max-x_min))
+    return 1 - ((x - x_min) / (x_max - x_min))
 
 
 class Track:
@@ -72,7 +73,11 @@ class Track:
         return self.trackpoints[0].direction_to(self.trackpoints[-1], deg)
 
     def __str__(self):
-        return "Length: '%i'. Age: '%i'. Avg size: '%f'. Avg. length between trackpoints: '%f'." % (self.total_length(), self.age, self.size_avg(), self.length_avg())
+        return "Length: '%i'. Age: '%i'. Avg size: '%f'. Avg. length \
+between trackpoints: '%f'." % (self.total_length(),
+                               self.age,
+                               self.size_avg(),
+                               self.length_avg())
 
     def size_avg(self):
         return np.average([tp.size for tp in self.trackpoints])
@@ -197,8 +202,8 @@ class Track:
         second_last_tp, last_tp = self.trackpoints[-2:]
         expected_next_point = Trackpoint(
             last_tp.timestamp + (last_tp.timestamp - second_last_tp.timestamp),
-            (2*last_tp.x - second_last_tp.x),
-            (2*last_tp.y - second_last_tp.y),
+            (2 * last_tp.x - second_last_tp.x),
+            (2 * last_tp.y - second_last_tp.y),
             None,
             )
         return expected_next_point
@@ -211,8 +216,8 @@ class Track:
 
         expected_tp = self.expected_next_point()
         if expected_tp is not None:
-            x = int((expected_tp.x + trackpoint.x)/2.0)
-            y = int((expected_tp.y + trackpoint.y)/2.0)
+            x = int((expected_tp.x + trackpoint.x) / 2.0)
+            y = int((expected_tp.y + trackpoint.y) / 2.0)
 
             new_trackpoint = trackpoint.copy()
             new_trackpoint.x = x
@@ -247,31 +252,39 @@ class Track:
         """
         assert(isinstance(trackpoint, Trackpoint))
         score = 1.0  # Total match.
-        
-        LOG.debug("TP: %s"%trackpoint)
+
+        LOG.debug("TP: %s" % trackpoint)
         distance = self.length_to(trackpoint)
-        if distance > track_match_radius*2.0:
-            LOG.debug("Too far away %f, %f"%(distance, track_match_radius*2.0))
+        if distance > track_match_radius * 2.0:
+            LOG.debug("Too far away %f, %f" % (distance,
+                                               track_match_radius * 2.0))
             score = 0
             return score
 
-        score *= score_factor(0, track_match_radius*2.0, distance)
-        LOG.debug("Score after dist %f"%score)
-            
-        expected_next_point = self.expected_next_point()
-        if False and expected_next_point != None:
-            expected_direction_deg = self.trackpoints[-1].direction_to(expected_next_point, deg=True)
-            direction_deg = self.trackpoints[-1].direction_to(trackpoint, deg=True)
-            delta_direction = diff_degrees(expected_direction_deg, direction_deg)
-            score *= score_factor(0, 180, abs(delta_direction))
-            LOG.debug("Score after exp. dir: %f"%score)
+        score *= score_factor(0, track_match_radius * 2.0, distance)
+        LOG.debug("Score after dist %f" % score)
 
-            distance_to_expected_next_point = trackpoint.length_to(expected_next_point)
-            score *= score_factor(0, track_match_radius, distance_to_expected_next_point)
-            LOG.debug("Score after exp. dist: %f"%score)
+        expected_next_point = self.expected_next_point()
+        if False and expected_next_point is not None:
+            expected_direction_deg = self.trackpoints[-1].direction_to(
+                expected_next_point,
+                deg=True)
+            direction_deg = self.trackpoints[-1].direction_to(trackpoint,
+                                                              deg=True)
+            delta_direction = diff_degrees(expected_direction_deg,
+                                           direction_deg)
+            score *= score_factor(0, 180, abs(delta_direction))
+            LOG.debug("Score after exp. dir: %f" % score)
+
+            distance_to_expected_next_point = trackpoint.length_to(
+                expected_next_point)
+            score *= score_factor(0,
+                                  track_match_radius,
+                                  distance_to_expected_next_point)
+            LOG.debug("Score after exp. dist: %f" % score)
         else:
             score *= score
-            LOG.debug("Score squared: %f"%score)
+            LOG.debug("Score squared: %f" % score)
 
         return score
 
@@ -303,7 +316,7 @@ class Track:
             return "Bike"
         else:
             return "Car"
-    
+
     @property
     def first_trackpoint(self):
         """
@@ -349,7 +362,7 @@ class Track:
         sql = '''INSERT INTO %s (%s) VALUES (%s)''' % (
             TABLE_NAME,
             ", ".join(keys),
-            ", ".join(["?"]*len(keys)))
+            ", ".join(["?"] * len(keys)))
 
         LOG.debug(sql)
 
@@ -385,4 +398,6 @@ class Track:
                 color=(0, 255, 0),
                 thickness=1)
             cv2.imwrite(os.path.join(track_dir, "%0.5i.png" % (i)), tp.frame)
-        LOG.info("Trackpoints '%s' saved to %s." % (status_name, track_dir))
+        LOG.info("'%s' track saved to %s. Track: %s " % (status_name,
+                                                         track_dir,
+                                                         self))

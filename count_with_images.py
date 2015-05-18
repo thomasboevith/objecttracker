@@ -61,7 +61,7 @@ def get_frames(path, raw_frames):
 
                 # Put the frame and timestamp into the buffer / queue.
                 raw_frames.put([raw_frame, timestamp])
-                
+
                 if raw_frames.qsize() > 100:
                     time.sleep(1)
 
@@ -131,7 +131,6 @@ if __name__ == "__main__":
     eroder.daemon = True
     eroder.start()
     LOG.info("Eroder started.")
-    
 
     # The dilate process dilates the foreground frame. This is done
     # after the erode process so that the frame is eroded and dilated.
@@ -186,7 +185,7 @@ dilated frames: %i, frames to save: %i.""" % (
         t = out
         # fgmask, raw_frame, timestamp = out
         # raw_frame, timestamp = out
-        
+
         for tp in t.trackpoints:
             frame = tp.frame
             t.draw_lines(frame)
