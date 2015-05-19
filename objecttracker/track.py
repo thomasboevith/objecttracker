@@ -248,7 +248,7 @@ between trackpoints: '%f'." % (self.total_length(),
             return True
         return False
 
-    def match_score(self, trackpoint, track_match_radius):
+    def match_score_trackpoint(self, trackpoint, track_match_radius):
         """
         Calculates a match score for a specific trackpoint.
         The higher the match score, the better match.
@@ -258,13 +258,13 @@ between trackpoints: '%f'." % (self.total_length(),
 
         LOG.debug("TP: %s" % trackpoint)
         distance = self.length_to(trackpoint)
-        if distance > track_match_radius * 2.0:
+        if distance > track_match_radius:
             LOG.debug("Too far away %f, %f" % (distance,
-                                               track_match_radius * 2.0))
+                                               track_match_radius))
             score = 0
             return score
 
-        score *= score_factor(0, track_match_radius * 2.0, distance)
+        score *= score_factor(0, track_match_radius, distance)
         LOG.debug("Score after dist %f" % score)
 
         expected_next_point = self.expected_next_point()
@@ -289,6 +289,26 @@ between trackpoints: '%f'." % (self.total_length(),
             score *= score
             LOG.debug("Score squared: %f" % score)
 
+        return score
+
+    def match_score_track(self, track, track_match_radius):
+        assert(isinstance(track, Track))
+        if len(track.trackpoints) < 4:
+            LOG.debug("Too small track to connect. Match score: 0")
+            return 0
+
+        diff_deg = abs(diff_degrees(self.direction_deg,
+                                    track.direction_deg))
+        threshold = 40
+        if diff_deg > threshold:
+            LOG.debug("Difference between tracks direction is \
+greater than %i. Match score: 0" % threshold)
+            return 0
+
+        score = 1
+        score *= score_factor(0, threshold, diff_deg)
+        score *= self.match_score_trackpoint(track.first_trackpoint,
+                                             track_match_radius)
         return score
 
     def draw_lines(self, frame, color=(255, 0, 255), thickness=1):

@@ -133,7 +133,8 @@ if __name__ == "__main__":
     LOG.info("Track match radius: %i" % (track_match_radius))
 
     if not args["--save-tracks"]:
-        LOG.info("Tracks will not be saved... Use --save-tracks to save tracks.")
+        LOG.info("Tracks will not be saved... \
+Use --save-tracks to save tracks.")
 
     raw_frames = multiprocessing.Queue()
     foreground_frames = multiprocessing.Queue()
@@ -213,7 +214,7 @@ if __name__ == "__main__":
 
         d = datetime.datetime.now()
         while True:
-            if (datetime.datetime.now() - d).total_seconds() > 60*30:
+            if (datetime.datetime.now() - d).total_seconds() > 60 * 30:
                 d = datetime.datetime.now()
                 print """Raw frames: %i, foreground frames: %i, eroded \
 frames: %i, dilated frames: %i, frames to save: %i.""" % (

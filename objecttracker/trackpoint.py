@@ -75,7 +75,8 @@ class Trackpoint:
         best_match_score = 0
 
         for t in tracks:
-            match_score = t.match_score(self, track_match_radius)
+            match_score = t.match_score_trackpoint(self,
+                                                   track_match_radius)
             if match_score > best_match_score:
                 best_match_score = match_score
                 best_match_track = t

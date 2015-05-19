@@ -137,7 +137,6 @@ def separate_tracks(trackpoints, tracks, track_match_radius):
     LOG.debug("Separating tracks.")
 
     # LOG.info("Tracks: %i %i"%(len(tracks), len(trackpoints)))
-    # print tracks
     LOG.debug("Inden: Tracks: %i %i" % (len(tracks), len(trackpoints)))
     tracks = match_trackpoints_with_tracks(trackpoints, tracks,
                                            track_match_radius)
@@ -180,15 +179,15 @@ def connect_tracks(tracks, tracks_to_save, track_match_radius):
     for track_to_save in tracks_to_save:
         matched_track = None
         max_score = 0
-
         for match_track in tracks:
-            score = track_to_save.match_score(match_track.first_trackpoint,
-                                              track_match_radius * 3)
+            score = track_to_save.match_score_track(
+                match_track,
+                track_match_radius * 3)
             if score > max_score:
                 matched_track = match_track
                 max_score = score
 
-        if matched_track is not None and max_score > 0.3:
+        if matched_track is not None and max_score > 0.2:
             tracks.remove(matched_track)
             tracks.append(track_to_save)
             track_to_save.connect_tracks(matched_track)
