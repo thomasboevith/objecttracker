@@ -213,7 +213,7 @@ if __name__ == "__main__":
 
         d = datetime.datetime.now()
         while True:
-            if (datetime.datetime.now() - d).total_seconds() > 90:
+            if (datetime.datetime.now() - d).total_seconds() > 60*30:
                 d = datetime.datetime.now()
                 print """Raw frames: %i, foreground frames: %i, eroded \
 frames: %i, dilated frames: %i, frames to save: %i.""" % (
