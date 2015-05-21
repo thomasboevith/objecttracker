@@ -2,7 +2,7 @@
 # coding: utf-8
 import os
 __doc__ = """
-
+Create a plot of the tracks.
 
 Usage:
     {filename} [options] [--verbose|--debug] [--date=<date>|(--date-from=<date> --date-to=<date>)]
@@ -59,40 +59,50 @@ if __name__ == "__main__":
 
     size_ranges = (0, 1000, 15000, 1000000)
     colors = ("c", "m", "y")
-    labels = ("S", "M", "L")
-    hour_range = ("07", "19")
+    labels = ["S", "M", "L"]
+    hour_range = ("06", "20")
+    x_min = int(hour_range[0])
+    x_max = int(hour_range[1])
+    ticks = ["%02i"%i for i in range(x_min, x_max+1)]
+    plt.xlim(xmin=x_min, xmax=x_max)
+    plt.xticks(range(x_min, x_max+1), ticks, rotation=30)
+
+    title = "%s"%(date_from.strftime("%Y-%m-%d"))
+    if (date_from - date_to).days > 1:
+        title += " - %s"%(date_to.strftime("%Y-%m-%d"))
+    if args['--street'] is not None:
+        title = "%s %s"%(args['--street'], title)
+    plt.title(title)
+
+    plt.xlabel("Time")
+    plt.ylabel("Antal")
         
-    sql = "SELECT strftime('%Y-%m-%dT%H', date), strftime('%H', date), COUNT() FROM tracks WHERE date BETWEEN ? AND ? AND avg_size BETWEEN ? AND ? AND strftime('%H', date) BETWEEN ? AND ? GROUP BY strftime('%Y-%m-%dT%H', date);"
+    sql = """SELECT
+               strftime('%Y-%m-%dT%H', date),
+               strftime('%H', date),
+               COUNT()
+             FROM
+               tracks
+             WHERE
+               date BETWEEN ? AND ?
+               AND avg_size BETWEEN ? AND ?
+               AND strftime('%H', date) BETWEEN ? AND ?
+             GROUP BY
+               strftime('%Y-%m-%dT%H', date);
+          """
 
     with objecttracker.database.Db() as db:
         LOG.debug("Getting data from db.")
-        x_min = int(hour_range[0])
-        x_max = int(hour_range[1])
-        ticks = ["%02i"%i for i in range(x_min, x_max+1)]
-        plt.xlim(xmin=x_min, xmax=x_max)
-        plt.xticks(range(x_min, x_max+1), ticks, rotation=30)
-
-        title = "%s"%(date_from.strftime("%Y-%m-%d"))
-        if (date_from - date_to).days > 1:
-            title += " - %s"%(date_to.strftime("%Y-%m-%d"))
-        if args['--street'] is not None:
-            title = "%s %s"%(args['--street'], title)
-        plt.title(title)
-
-        plt.xlabel("Time")
-        plt.ylabel("Antal")
-
         numbers = {}
-
         for i, size_range in enumerate(zip(size_ranges[0:], size_ranges[1:])):
             sql_values = (date_from, date_to, size_range[0], size_range[1], hour_range[0], hour_range[1])
             numbers[i] = []
-
+            total = 0
             for row in db.get_rows(sql, sql_values):
-                d, h, n = row
-                numbers[i].extend([int(h),] * n)
+                date, hour, count = row
+                numbers[i].extend([int(hour),] * count)
+            labels[i] += " (%i)"%(len(numbers[i]))
 
-        plt.hist(numbers.values(), bins=x_max+-x_min, range=(x_min, x_max), color=colors, label=labels, align='mid')
-
-        plt.legend()
-        plt.show()
+    plt.hist(numbers.values(), bins=x_max+-x_min, range=(x_min, x_max), color=colors, label=labels, align='mid')
+    plt.legend()
+    plt.show()
