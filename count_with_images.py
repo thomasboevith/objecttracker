@@ -15,6 +15,20 @@ Options:
                                     by --tracks-save-path
     --tracks-save-path=<path>       Where to save the tracks,
                                     [default: /data/tracks].
+    --track-match-radius=<radius>   Track match radius. When a trackpoint is
+                                    found, the matching track must be within
+                                    this radius from the last point in a track,
+                                    to match the track.
+                                                          ___
+                                                         /   \\
+                                      o---o----o---o----(--o  ) The new
+                                                         \___/ trackpoint
+                                                              must be within
+                                                            the track radius.
+
+                                    If not set, default value is calculated
+                                    from frame size and framerate.
+                                    [default: 25]
 """.format(filename=os.path.basename(__file__))
 
 import cv2
@@ -85,8 +99,8 @@ if __name__ == "__main__":
 
     resolution = (320, 240)
     min_linear_length = max(resolution) / 2
-    track_match_radius = min_linear_length / 10
-    print track_match_radius
+    track_match_radius = int(args["--track-match-radius"]) #min_linear_length / 10
+    print "Track match radius", track_match_radius
 
     # The frames queue is a list queue with list items.
     # Each item is a list with a timestamp and an image:
@@ -146,8 +160,8 @@ if __name__ == "__main__":
     # the tracks_to_save_queue.
     tracker_process = multiprocessing.Process(
         target=objecttracker.tracker,
-        # args=(dilated_frames, temp_queue, track_match_radius)
-        args=(dilated_frames, tracks_to_save, track_match_radius)
+        args=(dilated_frames, temp_queue, track_match_radius)
+        # args=(dilated_frames, tracks_to_save, track_match_radius)
         )
     tracker_process.daemon = True
     tracker_process.start()
@@ -178,8 +192,6 @@ dilated frames: %i, frames to save: %i.""" % (
                 eroded_frames.qsize(),
                 dilated_frames.qsize(),
                 tracks_to_save.qsize())
-        """
-
 
         out = temp_queue.get(block=True)
         t = out
@@ -196,7 +208,6 @@ dilated frames: %i, frames to save: %i.""" % (
             # cv2.imshow("fgmask", fgmask)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-                """
     # Wait for all processes to end, which should never happen.
     frame_reader.join()
 
