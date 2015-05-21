@@ -17,6 +17,7 @@ Options:
     --date-from=<date>              Date from. Format YYYY-MM-DD.
     --date-to=<date>                Date to. Not included. Format YYYY-MM-DD.
     --street=<street>               Street.
+    --output-dir=<dir>              Output directory. Where the plots are saved.
 """.format(filename=os.path.basename(__file__))
 
 import objecttracker
@@ -30,33 +31,7 @@ import matplotlib.pyplot as plt
 # Define the logger
 LOG = logging.getLogger(__name__)
 
-if __name__ == "__main__":
-    import docopt
-    args = docopt.docopt(__doc__, version="1.0")
-
-    if args["--debug"]:
-        logging.basicConfig(filename=args["--log-filename"],
-                            level=logging.DEBUG)
-    elif args["--verbose"]:
-        logging.basicConfig(filename=args["--log-filename"],
-                            level=logging.INFO)
-    else:
-        logging.basicConfig(filename=args["--log-filename"],
-                            level=logging.WARNING)
-    LOG.info(args)
-
-    if args['--date'] is not None:
-        date_from = datetime.datetime.strptime(args['--date'], "%Y-%m-%d")
-    elif args['--date-from'] is not None:
-        date_from = datetime.datetime.strptime(args['--date-from'], "%Y-%m-%d")
-    else:
-        date_from = datetime.datetime.now()
-
-    if args['--date-to'] is not None:
-        date_to = datetime.datetime.strptime(args['--date-to'], "%Y-%m-%d")
-    else:
-        date_to = date_from + datetime.timedelta(days=1)
-
+def create_plot(date_from, date_to, output_directory=None):
     size_ranges = (0, 1000, 15000, 1000000)
     colors = ("c", "m", "y")
     labels = ["S", "M", "L"]
@@ -76,7 +51,7 @@ if __name__ == "__main__":
 
     plt.xlabel("Time")
     plt.ylabel("Antal")
-        
+
     sql = """SELECT
                strftime('%Y-%m-%dT%H', date),
                strftime('%H', date),
@@ -95,7 +70,8 @@ if __name__ == "__main__":
         LOG.debug("Getting data from db.")
         numbers = {}
         for i, size_range in enumerate(zip(size_ranges[0:], size_ranges[1:])):
-            sql_values = (date_from, date_to, size_range[0], size_range[1], hour_range[0], hour_range[1])
+            sql_values = (date_from, date_to, size_range[0], size_range[1],
+                          hour_range[0], hour_range[1])
             numbers[i] = []
             total = 0
             for row in db.get_rows(sql, sql_values):
@@ -103,6 +79,59 @@ if __name__ == "__main__":
                 numbers[i].extend([int(hour),] * count)
             labels[i] += " (%i)"%(len(numbers[i]))
 
-    plt.hist(numbers.values(), bins=x_max+-x_min, range=(x_min, x_max), color=colors, label=labels, align='mid')
+    plt.hist(numbers.values(), bins=x_max-x_min, range=(x_min, x_max),
+             color=colors, label=labels, align='mid')
     plt.legend()
-    plt.show()
+    if output_directory is not None:
+        filename = os.path.join(args['--output-dir'],
+                                '%s.png'%(date_from.strftime("%Y-%m-%d")))
+        plt.savefig(filename, bbox_inches='tight')
+        print "%s saved"%(filename)
+    else:
+        plt.show()
+
+
+
+
+
+
+
+
+
+if __name__ == "__main__":
+    import docopt
+    args = docopt.docopt(__doc__, version="1.0")
+
+    if args["--debug"]:
+        logging.basicConfig(filename=args["--log-filename"],
+                            level=logging.DEBUG)
+    elif args["--verbose"]:
+        logging.basicConfig(filename=args["--log-filename"],
+                            level=logging.INFO)
+    else:
+        logging.basicConfig(filename=args["--log-filename"],
+                            level=logging.WARNING)
+    LOG.info(args)
+
+    if args['--date'] is not None:
+        date = datetime.datetime.strptime(args['--date'], "%Y-%m-%d")
+    elif args['--date-from'] is not None:
+        date = datetime.datetime.strptime(args['--date-from'], "%Y-%m-%d")
+    else:
+        date = datetime.datetime.now().date() - datetime.timedelta(days=1)
+        date_stop = datetime.datetime.now().date() + datetime.timedelta(days=1)
+
+    if date_stop is None:
+        if args['--date-to'] is not None:
+            date_stop = datetime.datetime.strptime(args['--date-to'], "%Y-%m-%d")
+        else:
+            date_stop = date + datetime.timedelta(days=1)
+
+    if (date_stop - date).days < 1:
+        raise ValueError("Date from '%s' must be at least one smaller than date to '%s'." % (date.isoformat(), date_stop.isoformat()))
+    
+    while date < date_stop:
+        date_to = date + datetime.timedelta(days=1)
+        create_plot(date, date_to, args["--output-dir"])
+        date += datetime.timedelta(days=1)
+    print "FIN"
