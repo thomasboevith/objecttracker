@@ -12,12 +12,13 @@ Options:
     -d, --debug                     Output a lot of info..
     -v, --verbose                   Output less less info.
     --log-filename=logfilename      Name of the log file.
-    --plot-path=<path>              Where to save the tracks,
-                                    [default: /data/plots
+    --date=<date>                   Date. If not specified: Today. Format YYYY-MM-DD.
     --date-from=<date>              Date from. Format YYYY-MM-DD.
     --date-to=<date>                Date to. Not included. Format YYYY-MM-DD.
-    --street=<street>               Street.
+    --street=<streetname>           Name of the street. Appears in the title of
+                                    the plot.
     --output-dir=<dir>              Output directory. Where the plots are saved.
+                                    [default: /data/plots]
 """.format(filename=os.path.basename(__file__))
 
 import objecttracker
@@ -26,12 +27,18 @@ import time
 import datetime
 import objecttracker.database
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+
+
+class PlotException(Exception):
+    pass
 
 # Define the logger
 LOG = logging.getLogger(__name__)
 
-def create_plot(date_from, date_to, output_directory=None):
+def create_plot(date_from, date_to, output_directory):
     size_ranges = (0, 1000, 15000, 1000000)
     colors = ("c", "m", "y")
     labels = ["S", "M", "L"]
@@ -82,20 +89,13 @@ def create_plot(date_from, date_to, output_directory=None):
     plt.hist(numbers.values(), bins=x_max-x_min, range=(x_min, x_max),
              color=colors, label=labels, align='mid')
     plt.legend()
-    if output_directory is not None:
+    if output_directory is not None and os.path.isdir(output_directory):
         filename = os.path.join(args['--output-dir'],
                                 '%s.png'%(date_from.strftime("%Y-%m-%d")))
         plt.savefig(filename, bbox_inches='tight')
         print "%s saved"%(filename)
     else:
-        plt.show()
-
-
-
-
-
-
-
+        raise PlotException("Output directory, '%s', must exist!" % (output_directory))
 
 
 if __name__ == "__main__":
@@ -118,8 +118,12 @@ if __name__ == "__main__":
     elif args['--date-from'] is not None:
         date = datetime.datetime.strptime(args['--date-from'], "%Y-%m-%d")
     else:
-        date = datetime.datetime.now().date() - datetime.timedelta(days=1)
-        date_stop = datetime.datetime.now().date() + datetime.timedelta(days=1)
+        date = datetime.datetime.now()
+        if date.hour < 2:
+            # Calcluate yesterday too, for two hours.
+            date = date.date() - datetime.timedelta(days=1)
+        date = date.date()
+        date_stop = date + datetime.timedelta(days=1)
 
     if date_stop is None:
         if args['--date-to'] is not None:
