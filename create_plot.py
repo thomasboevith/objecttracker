@@ -113,6 +113,8 @@ if __name__ == "__main__":
                             level=logging.WARNING)
     LOG.info(args)
 
+    date_stop = None
+
     if args['--date'] is not None:
         date = datetime.datetime.strptime(args['--date'], "%Y-%m-%d")
     elif args['--date-from'] is not None:

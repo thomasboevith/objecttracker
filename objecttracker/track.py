@@ -14,6 +14,9 @@ TABLE_NAME = "tracks"
 
 # How the tracs table should look.
 def create_tracks_table():
+    sqls = []
+
+    # Table.
     value_types = [
         "id            integer primary key",
         "date          text",
@@ -23,12 +26,21 @@ def create_tracks_table():
         "direction     real",
         "number_of_tp  integer",
         ]
-    SQL = '''CREATE TABLE IF NOT EXISTS %s (%s)''' % \
+    sql = '''CREATE TABLE IF NOT EXISTS %s (%s)''' % \
         (TABLE_NAME, ", ".join(value_types))
-    SQL = " ".join(SQL.split())
+    # Removing whitespaces.
+    sql = " ".join(sql.split())
+    sqls.append(sql)
+
+    # Indexes.
+    sqls.append("CREATE INDEX IF NOT EXISTS date_index ON %s (date)" % (TABLE_NAME))
+    sqls.append("CREATE INDEX IF NOT EXISTS size_index ON %s (avg_size)" % (TABLE_NAME))
+    sqls.append("CREATE INDEX IF NOT EXISTS direction_index ON %s (direction)" % (TABLE_NAME))
+
     with database.Db() as db:
-        LOG.debug(SQL)
-        db.execute(SQL)
+        for sql in sqls:
+            LOG.debug(sql)
+            db.execute(sql)
 
 # Create the table.
 create_tracks_table()
