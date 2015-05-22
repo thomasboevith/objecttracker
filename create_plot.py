@@ -46,7 +46,9 @@ def create_plot(date_from, date_to, output_directory):
     x_min = int(hour_range[0])
     x_max = int(hour_range[1])
     ticks = ["%02i"%i for i in range(x_min, x_max+1)]
+    plt.clf()
     plt.xlim(xmin=x_min, xmax=x_max)
+    plt.ylim(ymin=0, ymax=300)
     plt.xticks(range(x_min, x_max+1), ticks, rotation=30)
 
     title = "%s"%(date_from.strftime("%Y-%m-%d"))
