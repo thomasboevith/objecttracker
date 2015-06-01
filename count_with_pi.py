@@ -101,8 +101,8 @@ def get_frames(frames_queue, resolution, framerate,
 
 def save_frames(frames_queue, save_path):
     while True:
-        stamp, frame = frames_queue.get(block=True)
-        directory = os.path.join(savepath, stamp.strftime("%Y%m%dT%H"))
+        frame, stamp = frames_queue.get(block=True)
+        directory = os.path.join(save_path, stamp.strftime("%Y%m%dT%H"))
         if not os.path.isdir(directory):
             os.makedirs(directory)
         cv2.imwrite(os.path.join(directory, "%s.png" % stamp.isoformat()),
