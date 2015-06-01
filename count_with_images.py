@@ -37,6 +37,7 @@ import objecttracker
 import logging
 import time
 import datetime
+import numpy as np
 
 # Define the logger
 LOG = logging.getLogger(__name__)
@@ -81,6 +82,61 @@ def get_frames(path, raw_frames):
                 if raw_frames.qsize() > 100:
                     time.sleep(1)
 
+def do_it(raw_frames, track_match_radius, min_linear_length):
+    fgbg = cv2.BackgroundSubtractorMOG()
+    tracks = []
+    tracks_to_save = []
+    ff = True
+
+    i = 0
+    while True:
+        i += 1
+        if i % 1000 == 0:
+            ff = False
+
+        LOG.debug("Getting frame")
+        raw_frame, timestamp = raw_frames.get(block=True)
+        LOG.debug("Foreground extractor: Got a frame. Number in queue: %i." %
+                  raw_frames.qsize())
+
+        # Get the foreground.
+        fgmask = objecttracker.get_foreground(fgbg, raw_frame)
+    
+        # print np.unique(fgmask)
+        # fgmask = np.array(np.where(fgmask == 255, 255, 0), dtype=np.uint8)
+
+        # eroded_fgmask = objecttracker.erode(fgmask)
+        kernel = np.ones((15,15), dtype=np.uint8)
+        # fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, kernel)
+        fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, kernel, iterations=1)
+
+        total_tracks = len(tracks) + len(tracks_to_save)
+        # print total_tracks
+        # print ""
+        # dilated_fgmask = objecttracker.dilate(fgmask)
+        if total_tracks > 0:
+            fg = fgmask.copy()
+            for t in tracks:
+                t.draw_points(fg, (100,))
+            for t in tracks_to_save:
+                t.draw_points(fg, (150,))
+
+            cv2.imshow("FG", fg)
+            cv2.imshow("Frame", raw_frame)
+            if not ff:
+                time.sleep(1/16.0)
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                print "ff"
+                ff = True
+
+        tracks, tracks_to_save = objecttracker.get_tracks_to_save(fgmask,
+                                                                  raw_frame,
+                                                                  timestamp,
+                                                                  tracks,
+                                                                  track_match_radius)
+
+
 
 if __name__ == "__main__":
     import docopt
@@ -106,11 +162,6 @@ if __name__ == "__main__":
     # Each item is a list with a timestamp and an image:
     # E.g. [<timestamp>, <image>]
     raw_frames = multiprocessing.Queue()
-    foreground_frames = multiprocessing.Queue()
-    eroded_frames = multiprocessing.Queue()
-    dilated_frames = multiprocessing.Queue()
-    tracks_to_save = multiprocessing.Queue()
-    temp_queue = multiprocessing.Queue()
 
     # The only purpose of the framereader is to read the frames
     # from the camera / directory and put them into a buffer (frames queue).
@@ -126,88 +177,16 @@ if __name__ == "__main__":
     frame_reader.start()
     LOG.info("Frames reader started.")
 
-    # The main purpose of the foreground extractor is to
-    # separate the foreground from the background.
-    foreground_extractor = multiprocessing.Process(
-        target=objecttracker.foreground_extractor,
-        args=(raw_frames, foreground_frames, args["--save-tracks"])
-        )
-    foreground_extractor.daemon = True
-    foreground_extractor.start()
 
-    # The erode process takes a foreground frame and erodes the
-    # white pixels.
-    eroder = multiprocessing.Process(
-        target=objecttracker.eroder,
-        args=(foreground_frames, eroded_frames)
-        )
-    eroder.daemon = True
-    eroder.start()
-    LOG.info("Eroder started.")
-
-    # The dilate process dilates the foreground frame. This is done
-    # after the erode process so that the frame is eroded and dilated.
-    dilater = multiprocessing.Process(
-        target=objecttracker.dilater,
-        args=(eroded_frames, dilated_frames)
-        )
-    dilater.daemon = True
-    dilater.start()
-    LOG.info("Dilater started.")
-
-    # The tracker creates tracks from the frames.
-    # When a full track is created, it is inserted into
-    # the tracks_to_save_queue.
-    tracker_process = multiprocessing.Process(
-        target=objecttracker.tracker,
-        args=(dilated_frames, temp_queue, track_match_radius)
-        # args=(dilated_frames, tracks_to_save, track_match_radius)
-        )
-    tracker_process.daemon = True
-    tracker_process.start()
-    LOG.info("Tracker process started.")
-
-    # The track saver saves the tracks that needs to be saved.
     # It also puts the data into the database.
-    track_saver = multiprocessing.Process(
-        target=objecttracker.track_saver,
-        args=(
-            tracks_to_save,
-            min_linear_length,
-            track_match_radius,
-            args["--tracks-save-path"],
-            args["--save-tracks"]))
-    track_saver.daemon = True
-    track_saver.start()
-    LOG.info("Track saver started.")
+    do_iter = multiprocessing.Process(
+        target=do_it,
+        args=(raw_frames, track_match_radius, min_linear_length,)
+        )
+    do_iter.daemon = True
+    do_iter.start()
+    LOG.info("Doing it.")
 
-    d = datetime.datetime.now()
-    while True:
-        if (datetime.datetime.now() - d).total_seconds() > 10:
-            d = datetime.datetime.now()
-            print """Raw frames: %i, foreground frames: %i, eroded frames: %i,
-dilated frames: %i, frames to save: %i.""" % (
-                raw_frames.qsize(),
-                foreground_frames.qsize(),
-                eroded_frames.qsize(),
-                dilated_frames.qsize(),
-                tracks_to_save.qsize())
-
-        out = temp_queue.get(block=True)
-        t = out
-        # fgmask, raw_frame, timestamp = out
-        # raw_frame, timestamp = out
-
-        for tp in t.trackpoints:
-            frame = tp.frame
-            t.draw_lines(frame)
-            t.draw_points(frame)
-            tp.draw(frame)
-            cv2.imshow("Frame", frame)
-            time.sleep(1/16.0)
-            # cv2.imshow("fgmask", fgmask)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
     # Wait for all processes to end, which should never happen.
     frame_reader.join()
 

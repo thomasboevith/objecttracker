@@ -71,6 +71,10 @@ class Trackpoint:
         return tracks
 
     def get_best_match(self, tracks, track_match_radius):
+        """
+        Getting the track in tracks, that gives the best match,
+        if found.
+        """
         best_match_track = None
         best_match_score = 0
 
