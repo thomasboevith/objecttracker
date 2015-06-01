@@ -81,7 +81,8 @@ def get_bounding_box(contour):
 
 def get_trackpoints(fgmask, raw_frame, timestamp):
     """
-    Gets the trackpoints from the foreground mask.
+    Gets all the trackpoints from the foreground mask,
+    greater than a certain size.
     """
     # The area must have a certain size.
     min_object_area = min(fgmask.shape[0], fgmask.shape[1]) / 4
@@ -89,7 +90,8 @@ def get_trackpoints(fgmask, raw_frame, timestamp):
 
     # Collect the trackpoints.
     trackpoints = []
-    for cnt in connected_components.find_contours(fgmask):
+    # Remember that find countours changes the mask.
+    for cnt in connected_components.find_contours(fgmask.copy()):
         contour_area = cv2.contourArea(cnt)
         LOG.debug(contour_area)
         # Only use contours of a certain size.
@@ -123,24 +125,9 @@ def get_tracks_to_save(fgmask, raw_frame, timestamp, tracks,
     # Get all trackpoints from the fgmask.
     trackpoints = get_trackpoints(fgmask, raw_frame, timestamp)
 
-    # Match the tracks with the trackpoints.
-    tracks, tracks_to_save = separate_tracks(trackpoints, tracks,
-                                             track_match_radius)
-    return tracks, tracks_to_save
-
-
-def separate_tracks(trackpoints, tracks, track_match_radius):
-    """
-    Dividing tracks into the tracks to be saved and the other
-    tracks (the ones to keep adding to).
-    """
-    LOG.debug("Separating tracks.")
-
-    # LOG.info("Tracks: %i %i"%(len(tracks), len(trackpoints)))
-    LOG.debug("Inden: Tracks: %i %i" % (len(tracks), len(trackpoints)))
+    # Matching trackpoints with tracks.
     tracks = match_trackpoints_with_tracks(trackpoints, tracks,
                                            track_match_radius)
-    LOG.debug("Efter: tracks: %i %i" % (len(tracks), len(trackpoints)))
 
     for t in tracks:
         t.incr_age()
@@ -148,6 +135,21 @@ def separate_tracks(trackpoints, tracks, track_match_radius):
     # Remove old tracks that are smaller than the diameter of the
     # match circle.
     tracks = prune_tracks(tracks, track_match_radius * 2)
+
+    # Split the tracks into tracks to save
+    tracks, tracks_to_save = split_tracks(tracks,
+                                          track_match_radius)
+
+
+    return tracks, tracks_to_save
+
+
+def split_tracks(tracks, track_match_radius):
+    """
+    Dividing tracks into the tracks to be saved and the other
+    tracks (the ones to keep adding to).
+    """
+    LOG.debug("Separating tracks.")
 
     # Split old and new tracks.
     tracks_to_save = []
@@ -214,6 +216,7 @@ def match_trackpoints_with_tracks(trackpoints, tracks, track_match_radius):
     """
     for tp in trackpoints:
         best_matched_track = tp.get_best_match(tracks, track_match_radius)
+
         LOG.debug("Best matched track: %s" % best_matched_track)
         if best_matched_track is None:
             LOG.debug("Creating new track.")
@@ -234,13 +237,16 @@ def prune_tracks(tracks, min_track_length):
     Removes tracks that are obviously not useful.
     """
     tracks_to_keep = []
-    for t in tracks:
+    while len(tracks) > 0:
+        t = tracks.pop()
         if t.age < 6:
-            # Keep all newly updated tracks.
+            # Keep all newly updated tracks, no
+            # matter the length.
             tracks_to_keep.append(t)
             continue
 
         # Age is larger than above.
+        # Checking for length.
         if t.total_length() > min_track_length:
             # Keep all old tracks if the length is
             # long enough. Remove very small tracks.
@@ -257,6 +263,9 @@ def draw_tracks(tracks, frame):
         t.draw_lines(frame)
         t.draw_points(frame)
 
+def close(frame):
+    kernel = np.ones((15,15), dtype=np.uint8)
+    return cv2.morphologyEx(frame, cv2.MORPH_CLOSE, kernel, iterations=1)
 
 def erode(frame):
     """
@@ -313,6 +322,16 @@ def foreground_extractor(raw_frames, foreground_frames, save_raw_frame=False):
 
         # Insert the frame and the timestamp into the buffer.
         foreground_frames.put([fgmask, raw_frame, timestamp])
+
+
+def closer(input_frames, output_frames):
+    while True:
+        LOG.debug("Closer: Waiting for a frame.")
+        fgmask, raw_frame, timestamp = input_frames.get(block=True)
+        LOG.debug("Closer: Got a input frame. Number in queue: %i." %
+                  input_frames.qsize())
+        closed_fgmask = close(fgmask)
+        output_frames.put([closed_fgmask, raw_frame, timestamp])
 
 
 def eroder(input_frames, output_frames):

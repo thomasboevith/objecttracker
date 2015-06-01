@@ -138,8 +138,9 @@ Use --save-tracks to save tracks.")
 
     raw_frames = multiprocessing.Queue()
     foreground_frames = multiprocessing.Queue()
-    eroded_frames = multiprocessing.Queue()
-    dilated_frames = multiprocessing.Queue()
+    # eroded_frames = multiprocessing.Queue()
+    closed_frames = multiprocessing.Queue()
+    # dilated_frames = multiprocessing.Queue()
     tracks_to_save = multiprocessing.Queue()
 
     # The frame reader puts the frames into the frames queue.
@@ -166,8 +167,19 @@ Use --save-tracks to save tracks.")
         foreground_extractor.daemon = True
         foreground_extractor.start()
 
+        
+        closer = multiprocessing.Process(
+            target=objecttracker.closer,
+            args=(foreground_frames, closed_frames)
+            )
+        closer.daemon = True
+        closer.start()
+        LOG.info("Closer started.")
+
+
         # The erode process takes a foreground frame and erodes the
         # white pixels.
+        """
         eroder = multiprocessing.Process(
             target=objecttracker.eroder,
             args=(foreground_frames, eroded_frames)
@@ -185,6 +197,7 @@ Use --save-tracks to save tracks.")
         dilater.daemon = True
         dilater.start()
         LOG.info("Dilater started.")
+        """
 
         # The tracker creates tracks from the frames.
         # When a full track is created, it is inserted into
@@ -192,7 +205,8 @@ Use --save-tracks to save tracks.")
         tracker_process = multiprocessing.Process(
             target=objecttracker.tracker,
             # args=(dilated_frames, temp_queue, track_match_radius)
-            args=(dilated_frames, tracks_to_save, track_match_radius)
+            # args=(dilated_frames, tracks_to_save, track_match_radius)
+            args=(closed_frames, tracks_to_save, track_match_radius)
             )
         tracker_process.daemon = True
         tracker_process.start()
@@ -216,12 +230,10 @@ Use --save-tracks to save tracks.")
         while True:
             if (datetime.datetime.now() - d).total_seconds() > 60 * 30:
                 d = datetime.datetime.now()
-                print """Raw frames: %i, foreground frames: %i, eroded \
-frames: %i, dilated frames: %i, frames to save: %i.""" % (
+                print """Raw frames: %i, foreground frames: %i, closed frames: %i, frames to save: %i.""" % (
                     raw_frames.qsize(),
                     foreground_frames.qsize(),
-                    eroded_frames.qsize(),
-                    dilated_frames.qsize(),
+                    closed_frames.qsize(),
                     tracks_to_save.qsize())
 
     # Wait for all processes to end, which should never happen.
