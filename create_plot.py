@@ -125,7 +125,7 @@ if __name__ == "__main__":
         date = datetime.datetime.now()
         if date.hour < 2:
             # Calcluate yesterday too, for two hours.
-            date = date.date() - datetime.timedelta(days=1)
+            date = date - datetime.timedelta(days=1)
         date = date.date()
         date_stop = date + datetime.timedelta(days=1)
 
