@@ -2,7 +2,7 @@
 # coding: utf-8
 import os
 __doc__ = """Usage:
-    {filename} <variable> [options] [--verbose|--debug]
+    {filename} <variable> [-k <number_of_classes>] [options] [--verbose|--debug]
 
 Options:
     -h, --help                        This help message.

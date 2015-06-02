@@ -24,7 +24,7 @@ Options:
                                     If not set, default value is calculated
                                     from frame size and framerate.
     --frame-rate=<framerate>        The camera frame rate. I.e. number of
-                                    images / second. [default: 12].
+                                    images / second. [default: 16].
     --record-frames-path=<path>     Where to save the frames.
                                     [default: /data/frames].
     --save-tracks                   Save the tracks to disk. Set the path
