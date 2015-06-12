@@ -38,6 +38,8 @@ import logging
 import time
 import datetime
 import numpy as np
+import sys
+import os
 
 # Define the logger
 LOG = logging.getLogger(__name__)
@@ -82,7 +84,7 @@ def get_frames(path, raw_frames):
                 if raw_frames.qsize() > 100:
                     time.sleep(1)
 
-def do_it(raw_frames, track_match_radius, min_linear_length):
+def do_it(raw_frames, track_match_radius, min_linear_length, stdin):
     fgbg = cv2.BackgroundSubtractorMOG()
     tracks = []
     tracks_to_save = []
@@ -114,7 +116,7 @@ def do_it(raw_frames, track_match_radius, min_linear_length):
         # print total_tracks
         # print ""
         # dilated_fgmask = objecttracker.dilate(fgmask)
-        if total_tracks > 0:
+        if False and total_tracks > 0:
             fg = fgmask.copy()
             for t in tracks:
                 t.draw_points(fg, (100,))
@@ -136,6 +138,62 @@ def do_it(raw_frames, track_match_radius, min_linear_length):
                                                                   tracks,
                                                                   track_match_radius)
 
+
+        cv2.namedWindow('image', cv2.WINDOW_NORMAL)
+
+        for track_to_save in tracks_to_save:
+            print ""
+            length = track_to_save.linear_length()
+            if length < min_linear_length:
+                valid = False
+            else:
+                valid = True
+            
+            if valid:
+                if track_to_save.direction() < 0:
+                    direction = "left"
+                else:
+                    direction =  "right"
+
+                size = track_to_save.avg_size()
+                if size < 700 and track_to_save.length_avg() < 4:
+                    expected_type = "pers."
+                elif size < 2000:
+                    expected_type = "bike"
+                elif size < 10000:
+                    expected_type = "car"
+                else:
+                    expected_type = "truck"
+
+            if not valid:
+                text = "Invalid"
+            else:
+                text = "%s %s"%(expected_type, direction)
+
+            print text
+            print track_to_save.avg_size(), track_to_save.direction(), track_to_save.length_avg()
+
+            middle_trackpoint = track_to_save.trackpoints[len(track_to_save.trackpoints)/2]
+            filename = "/home/hallgeir/Desktop/til_thomas/%s.png"%(middle_trackpoint.timestamp.isoformat())
+            frame = middle_trackpoint.frame.copy()
+            track_to_save.draw_points(frame)
+            track_to_save.draw_lines(frame)
+            cv2.putText(frame, text, (3, frame.shape[0]/2), cv2.FONT_HERSHEY_SIMPLEX, 1, (50, 255, 50))
+            
+            cv2.imshow("image", frame)
+            print "Writing filename %s "%(filename)
+            cv2.imwrite(filename, frame)
+            # k = cv2.waitKey(1) & 0xFF == ord('q')
+
+            #correct = None
+            # while(correct is None):
+              #  stroke = stdin.readline().strip().lower()
+              #  if stroke in ["i", ""]:
+              #      correct = stroke == ""
+
+
+
+    cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
@@ -178,10 +236,11 @@ if __name__ == "__main__":
     LOG.info("Frames reader started.")
 
 
+    new_stdin = os.fdopen(os.dup(sys.stdin.fileno()))
     # It also puts the data into the database.
     do_iter = multiprocessing.Process(
         target=do_it,
-        args=(raw_frames, track_match_radius, min_linear_length,)
+        args=(raw_frames, track_match_radius, min_linear_length, new_stdin)
         )
     do_iter.daemon = True
     do_iter.start()

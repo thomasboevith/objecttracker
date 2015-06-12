@@ -5,7 +5,7 @@ __doc__ = """
 Plot values from the database on a line.
 
 Usage:
-    {filename} <point_type> [options] [--verbose|--debug] [--date=<date>|(--date-from=<date> --date-to=<date>)]
+    {filename} <x_axis_type> <y_axis_type> [options] [--verbose|--debug] [--date=<date>|(--date-from=<date> --date-to=<date>)]
 
 Options:
     -h, --help                      This help message.
@@ -35,7 +35,7 @@ class PlotException(Exception):
 # Define the logger
 LOG = logging.getLogger(__name__)
 
-def create_plot(point_type, date_from, date_to, output_directory):
+def create_plot(x_type, y_type, date_from, date_to, output_directory):
     # ticks = ["%02i"%i for i in range(x_min, x_max+1)]
     plt.clf()  # Clear figure.
     # plt.xlim(xmin=x_min, xmax=x_max)
@@ -49,25 +49,47 @@ def create_plot(point_type, date_from, date_to, output_directory):
         title = "%s %s"%(args['--street'], title)
     plt.title(title)
 
-    plt.xlabel(point_type)
-    plt.ylabel(point_type)
+    plt.xlabel(x_type)
+    plt.ylabel(y_type)
 
     sql = """SELECT
-               {point_type}
+               {x_type},
+               {y_type}
              FROM
                tracks
              WHERE
                date BETWEEN ? AND ?
-               AND {point_type} < ?
-          """.format(point_type=point_type)
+               AND {x_type} < ?
+          """.format(x_type=x_type, y_type=y_type)
 
-    max_size = 20000
+    max_size = 7000
+    x_values = {"pers": [], "bike": [], "car": [], "truck": []}
+    y_values = {"pers": [], "bike": [], "car": [], "truck": []}
+    colors = ["r", "g", "c", "y"]
+
     with objecttracker.database.Db() as db:
         LOG.debug("Getting data from db.")
         sql_values = (date_from, date_to, max_size)
-        values = [float(row[0]) for row in db.get_rows(sql, sql_values)]
+        for row in db.get_rows(sql, sql_values):
+            size = float(row[0])
+            speed = float(row[1])
 
-    plt.hist(values, bins=100, range=(0, max_size))
+            if size < 700 and speed < 4:
+                expected_type = "pers"
+            elif size < 1300:
+                expected_type = "bike"
+            elif size < 10000:
+                expected_type = "car"
+            else:
+                expected_type = "truck"
+
+            x_values[expected_type].append(size)
+            y_values[expected_type].append(speed)
+
+    for i, key in enumerate(x_values.keys()):
+        plt.plot(x_values[key], y_values[key], '%s.'%(colors[i]))
+
+    # plt.hist(values, bins=100, range=(0, max_size))
     # plt.plot(values, values, 'ro', label=len(values))
     plt.legend()
     if output_directory is not None and os.path.isdir(output_directory):
@@ -118,5 +140,5 @@ if __name__ == "__main__":
     if (date_stop - date).days < 1:
         raise ValueError("Date from '%s' must be at least one smaller than date to '%s'." % (date.isoformat(), date_stop.isoformat()))
     
-    create_plot(args["<point_type>"], date, date_stop, args["--output-dir"])
+    create_plot(args["<x_axis_type>"], args["<y_axis_type>"], date, date_stop, args["--output-dir"])
     print "FIN"
