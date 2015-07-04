@@ -39,7 +39,7 @@ class PlotException(Exception):
 LOG = logging.getLogger(__name__)
 
 def create_plot(date_from, date_to, output_directory):
-    size_ranges = (0, 1000, 10000, 1000000)
+    size_ranges = (0, 2000, 10000, 1000000)
     colors = ("c", "m", "y")
     labels = ["S", "M", "L"]
     hour_range = ("05", "21")
